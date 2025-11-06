@@ -1,0 +1,296 @@
+{
+  "entities": {
+    "Game": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Game",
+      "type": "object",
+      "description": "Represents a single game instance in Prompt Jeopardy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Game entity."
+        },
+        "adminId": {
+          "type": "string",
+          "description": "Reference to the Admin user who created the game. (Relationship: Admin 1:N Game)"
+        },
+        "gameName": {
+          "type": "string",
+          "description": "The name of the game."
+        },
+        "settings": {
+          "type": "string",
+          "description": "JSON string that contains game settings (e.g., round duration, point values)."
+        },
+        "currentRoundId": {
+          "type": "string",
+          "description": "Reference to the currently active Round. (Relationship: Game 1:1 Round)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the game was created.",
+          "format": "date-time"
+        },
+        "gameUrl": {
+          "type": "string",
+          "description": "A unique URL used by contestants to join the game."
+        }
+      },
+      "required": [
+        "id",
+        "adminId",
+        "gameName",
+        "settings",
+        "createdAt",
+        "gameUrl"
+      ]
+    },
+    "Round": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Round",
+      "type": "object",
+      "description": "Represents a single round within a Prompt Jeopardy game.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Round entity."
+        },
+        "gameId": {
+          "type": "string",
+          "description": "Reference to the Game this round belongs to. (Relationship: Game 1:N Round)"
+        },
+        "question": {
+          "type": "string",
+          "description": "The question presented to the contestants."
+        },
+        "correctPersona": {
+          "type": "string",
+          "description": "The correct persona for the round."
+        },
+        "correctAction": {
+          "type": "string",
+          "description": "The correct action for the round."
+        },
+        "startTime": {
+          "type": "string",
+          "description": "Timestamp indicating when the round started.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "Timestamp indicating when the round ended.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "gameId",
+        "question",
+        "correctPersona",
+        "correctAction",
+        "startTime",
+        "endTime"
+      ]
+    },
+    "Contestant": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Contestant",
+      "type": "object",
+      "description": "Represents a contestant participating in a Prompt Jeopardy game.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Contestant entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "The unique Google ID of the contestant."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the contestant."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL of the contestant's avatar image.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "googleId",
+        "name",
+        "avatarUrl"
+      ]
+    },
+    "Submission": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Submission",
+      "type": "object",
+      "description": "Represents a contestant's submission in a specific round.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Submission entity."
+        },
+        "roundId": {
+          "type": "string",
+          "description": "Reference to the Round this submission belongs to. (Relationship: Round 1:N Submission)"
+        },
+        "contestantId": {
+          "type": "string",
+          "description": "Reference to the Contestant who made the submission. (Relationship: Contestant 1:N Submission)"
+        },
+        "personaGuess": {
+          "type": "string",
+          "description": "The contestant's guess for the persona."
+        },
+        "actionGuess": {
+          "type": "string",
+          "description": "The contestant's guess for the action."
+        },
+        "submissionTime": {
+          "type": "string",
+          "description": "Timestamp indicating when the submission was made.",
+          "format": "date-time"
+        },
+        "isCorrect": {
+          "type": "boolean",
+          "description": "Indicates whether the submission was correct."
+        }
+      },
+      "required": [
+        "id",
+        "roundId",
+        "contestantId",
+        "personaGuess",
+        "actionGuess",
+        "submissionTime",
+        "isCorrect"
+      ]
+    },
+    "Admin": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Admin",
+      "type": "object",
+      "description": "Represents an admin user who manages the games.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Admin entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "The unique Google ID of the admin user."
+        }
+      },
+      "required": [
+        "id",
+        "googleId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/games/{gameId}",
+        "definition": {
+          "entityName": "Game",
+          "schema": {
+            "$ref": "#/backend/entities/Game"
+          },
+          "description": "Stores game instances. The 'adminId' field indicates the game creator and is used for authorization.",
+          "params": [
+            {
+              "name": "gameId",
+              "description": "Unique identifier for the game."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/games/{gameId}/rounds/{roundId}",
+        "definition": {
+          "entityName": "Round",
+          "schema": {
+            "$ref": "#/backend/entities/Round"
+          },
+          "description": "Stores round data for a specific game. Access is controlled by the game's admin.",
+          "params": [
+            {
+              "name": "gameId",
+              "description": "Unique identifier for the game."
+            },
+            {
+              "name": "roundId",
+              "description": "Unique identifier for the round."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/games/{gameId}/rounds/{roundId}/submissions/{submissionId}",
+        "definition": {
+          "entityName": "Submission",
+          "schema": {
+            "$ref": "#/backend/entities/Submission"
+          },
+          "description": "Stores contestant submissions for a specific round in a game. Access is limited to the game's admin and the submitting contestant.",
+          "params": [
+            {
+              "name": "gameId",
+              "description": "Unique identifier for the game."
+            },
+            {
+              "name": "roundId",
+              "description": "Unique identifier for the round."
+            },
+            {
+              "name": "submissionId",
+              "description": "Unique identifier for the submission."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/contestants/{contestantId}",
+        "definition": {
+          "entityName": "Contestant",
+          "schema": {
+            "$ref": "#/backend/entities/Contestant"
+          },
+          "description": "Stores contestant data. 'contestantId' must match the Firebase auth 'uid' for path-based ownership.",
+          "params": [
+            {
+              "name": "contestantId",
+              "description": "Unique identifier for the contestant, which matches their Firebase auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/admins/{adminId}",
+        "definition": {
+          "entityName": "Admin",
+          "schema": {
+            "$ref": "#/backend/entities/Admin"
+          },
+          "description": "Stores admin user data. 'adminId' must match the Firebase auth 'uid' for path-based ownership.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "Unique identifier for the admin user, which matches their Firebase auth UID."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the Prompt Jeopardy application's core features, focusing on security, scalability, and ease of debugging.  The structure enforces Authorization Independence (CRITICAL) to avoid hierarchical authorization dependencies, which simplifies security rules and enables atomic operations. It also ensures security for list operations (QAPs) through structural segregation and membership models where appropriate.\n\n**Explanation of Authorization Independence and QAPs:**\n\n*   **Admin Owned Games:** The `games` collection stores game instances created by admins. The `adminId` field ensures that only the admin who created the game can manage it. There are no subcollections under `games` that require access control dependent on the Game object.\n*   **User Identification and Management:**  The structure assumes that the contestant's Google ID is managed by Firebase Auth.  User-specific contestant data is stored in `/contestants/{contestantId}`, and the `contestantId` is identical to the Firebase `uid`. This facilitates straightforward security rules based on `request.auth.uid`.\n\n    *   Because the `contestants` collection is flat and uses path-based ownership, list operations are secure. An attacker cannot list other contestant's records. Only authenticated users can access their own record.\n*   **Round Data:** Rounds associated with a game are stored in `/games/{gameId}/rounds/{roundId}`. Since rounds are tightly coupled with a specific game managed by an admin, access is implicitly controlled through the admin's access to the game itself.  There's no direct listing of rounds across games, ensuring QAPs are met.\n*   **Submissions:** Each submission by a contestant is stored in `/games/{gameId}/rounds/{roundId}/submissions/{submissionId}`. This structure maintains a clear hierarchy: an admin owns the game, which contains rounds, which contain submissions. Contestant access is tied to the round, preventing cross-game access.\n\n    *   The structure ensures that an admin can only list submissions for their game by accessing the subcollection `/games/{gameId}/rounds/{roundId}/submissions/{submissionId}`.\n*   **Global Roles:** This implementation does not require global roles such as 'admin', as admin permissions are scoped to the game they create via the `adminId` property of the game. Therefore, no specific global role collections are created."
+  }
+}
