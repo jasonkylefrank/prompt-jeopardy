@@ -37,7 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleRedirect = async () => {
       try {
         if (auth) {
-          await getRedirectResult(auth);
+          // This function gets the result of the redirect operation.
+          const result = await getRedirectResult(auth);
+          // If the result is null, it means the user just landed on the page
+          // without having been redirected from the Google login screen.
+          if (result) {
+             toast({
+                title: "Signed In",
+                description: `Welcome back, ${result.user.displayName}!`,
+             });
+          }
         }
       } catch (error: any) {
         console.error('Login failed:', error);
@@ -68,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
+    // We use signInWithRedirect, which is better for mobile and complex flows.
     await signInWithRedirect(auth, provider);
   };
 
@@ -84,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, isUserLoading, firebaseUser, auth]
+    [user, isUserLoading, firebaseUser, signIn, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
