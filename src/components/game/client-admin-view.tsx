@@ -38,9 +38,11 @@ import {
   CheckCircle,
   Trophy,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
+import Link from "next/link";
 
 export function ClientAdminView({ initialGame }: { initialGame: Game }) {
   const { game } = useGameState(initialGame);
@@ -106,6 +108,12 @@ export function ClientAdminView({ initialGame }: { initialGame: Game }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+           <Button variant="outline" asChild>
+                <Link href={`/game/${game.id}`} target="_blank">
+                    <Eye />
+                    <span>View as Contestant</span>
+                </Link>
+           </Button>
            <Label htmlFor="game-link" className="sr-only">Game Link</Label>
            <Input id="game-link" value={`${window.location.origin}/game/${game.id}`} readOnly className="w-64"/>
           <Button variant="outline" size="icon" onClick={copyGameLink}>
