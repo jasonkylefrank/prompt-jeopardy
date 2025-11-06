@@ -1,7 +1,7 @@
 'use client';
 
 import type { User as FirebaseUser } from 'firebase/auth';
-import { useFirebase, useUser } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { createContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { User } from '@/lib/types';
 import {
@@ -29,37 +29,35 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user: firebaseUser, isUserLoading } = useUser();
-  const { auth } = useFirebase();
+  // Consume the stable user state from the main FirebaseProvider
+  const { auth, user: firebaseUser, isUserLoading } = useFirebase();
   const { toast } = useToast();
 
   useEffect(() => {
-    const handleRedirect = async () => {
-      if (!auth) return;
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          toast({
-            title: "Signed In",
-            description: `Welcome back, ${result.user.displayName}!`,
-          });
-        }
-      } catch (error: any) {
-        console.error('Login failed after redirect:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description:
-            'There was a problem signing in with Google after redirect. Please try again.',
-        });
-      }
-    };
-    
-    // Only run this on the initial load when auth is available
+    // This effect should only run once when auth is available to handle the redirect result.
     if (auth && !isUserLoading) {
-      handleRedirect();
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result) {
+            // User successfully signed in.
+            toast({
+              title: "Signed In",
+              description: `Welcome back, ${result.user.displayName}!`,
+            });
+          }
+        })
+        .catch((error) => {
+          // Handle errors here.
+          console.error('Login failed after redirect:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Login Failed',
+            description:
+              'There was a problem signing in with Google. Please try again.',
+          });
+        });
     }
-  }, [auth, isUserLoading, toast]);
+  }, [auth, isUserLoading, toast]); // Dependencies ensure this runs at the right time
 
   const user: User | null = useMemo(() => {
     if (!firebaseUser) return null;
@@ -75,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
+    // Start the sign-in process
     await signInWithRedirect(auth, provider);
   };
 
