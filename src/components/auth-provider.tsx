@@ -49,10 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // This handles the redirect result after a user signs in.
+    // This effect runs only once on mount.
+    
+    // First, process the redirect result. This is critical for post-login flow.
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
+          // User successfully signed in or linked.
           toast({
             title: 'Signed In',
             description: `Welcome back, ${result.user.displayName}!`,
@@ -66,20 +69,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           title: 'Login Failed',
           description: 'There was a problem signing in. Please try again.',
         });
-      })
-      .finally(() => {
-        // Set up the state change listener AFTER processing the redirect.
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          setFirebaseUser(user);
-          setLoading(false);
-        }, (error) => {
-          console.error('Auth Error from onAuthStateChanged:', error);
-          setLoading(false);
-        });
-        
-        // Cleanup listener on unmount
-        return () => unsubscribe();
       });
+
+    // Then, set up the state change listener. This will fire after getRedirectResult
+    // and for any other auth state changes.
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setLoading(false);
+    }, (error) => {
+      console.error('Auth Error from onAuthStateChanged:', error);
+      setFirebaseUser(null);
+      setLoading(false);
+    });
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, [toast]);
   
   const user: User | null = useMemo(() => {
