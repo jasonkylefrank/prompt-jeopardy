@@ -11,10 +11,9 @@ import {
 import {
   getAuth,
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithPopup,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
-  getRedirectResult,
   type Auth,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -49,12 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up the onAuthStateChanged listener immediately and permanently.
-    // This will react to all auth state changes, including the one from getRedirectResult.
+    // Set up the onAuthStateChanged listener. This is the source of truth for the user's auth state.
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
-        console.log("onAuthStateChanged fired. User:", user ? user.uid : 'null');
         setFirebaseUser(user);
         setLoading(false);
       },
@@ -65,34 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Separately, process the redirect result.
-    // This should only run once when the app loads after the redirect.
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          // If sign-in was successful, onAuthStateChanged will handle the user state.
-          console.log('Redirect result processed. User:', result.user.displayName);
-          toast({
-            title: 'Signed In',
-            description: `Welcome back, ${result.user.displayName}!`,
-          });
-        }
-        // If result is null, it means it's not a redirect sign-in, or the user is already signed in.
-        // In this case, the onAuthStateChanged listener above will have already fired with the current session user.
-      })
-      .catch((error) => {
-        console.error('Error processing redirect result:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description:
-            error.message || 'There was a problem signing in. Please try again.',
-        });
-      });
-
     // Clean up the listener on component unmount.
     return () => unsubscribe();
-  }, [toast]);
+  }, []);
 
   const user: User | null = useMemo(() => {
     if (!firebaseUser) return null;
@@ -107,11 +79,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle the user state update.
+      toast({
+        title: 'Signed In',
+        description: `Welcome back, ${result.user.displayName}!`,
+      });
+    } catch (error: any) {
+      console.error('Error during sign-in:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description:
+          error.message || 'There was a problem signing in. Please try again.',
+      });
+      setLoading(false); // Ensure loading is false on error
+    }
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    // onAuthStateChanged will set the user to null.
     toast({
       title: 'Signed Out',
       description: 'You have been successfully signed out.',
