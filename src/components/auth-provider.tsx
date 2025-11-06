@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {
+        console.log('onAuthStateChanged fired. User:', user);
         setFirebaseUser(user);
         setLoading(false);
       },
@@ -79,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async () => {
     const provider = new GoogleAuthProvider();
-    setLoading(true);
     try {
       const result = await signInWithPopup(auth, provider);
       // onAuthStateChanged will handle the user state update.
@@ -89,13 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } catch (error: any) {
       console.error('Error during sign-in:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description:
-          error.message || 'There was a problem signing in. Please try again.',
-      });
-      setLoading(false); // Ensure loading is false on error
+      // Don't show a toast for user-closed popups
+      if (error.code !== 'auth/popup-closed-by-user') {
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description:
+            error.message ||
+            'There was a problem signing in. Please try again.',
+        });
+      }
     }
   };
 
