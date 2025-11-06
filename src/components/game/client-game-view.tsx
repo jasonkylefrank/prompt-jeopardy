@@ -1,11 +1,12 @@
 "use client";
 
-import type { Game } from "@/lib/types";
+import type { Game, User } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { useGameState } from "@/hooks/use-game-state";
 import { Lobby } from "@/components/game/lobby";
 import { GameBoard } from "@/components/game/game-board";
 import { AppLogo } from "../icons";
+import { Loader2 } from "lucide-react";
 
 type ClientGameViewProps = {
   initialGame: Game;
@@ -19,7 +20,9 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
         <AppLogo className="h-20 w-20 animate-pulse text-primary" />
-        <p className="text-lg text-muted-foreground">Authenticating...</p>
+        <p className="flex items-center gap-2 text-lg text-muted-foreground">
+          <Loader2 className="animate-spin" /> Authenticating & loading game...
+        </p>
       </div>
     );
   }
@@ -30,3 +33,5 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
 
   return <GameBoard game={game} currentUser={user} />;
 }
+
+    

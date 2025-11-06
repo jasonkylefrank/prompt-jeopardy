@@ -15,12 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, PartyPopper, Zap } from "lucide-react";
+import { Loader2, PartyPopper, Zap, LogIn, LogOut } from "lucide-react";
 import { AppLogo } from "@/components/icons";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signIn, signOut } = useAuth();
   const [loading, setLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [gameId, setGameId] = useState("");
@@ -68,6 +69,34 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4">
+      <div className="absolute top-4 right-4">
+        {authLoading ? (
+          <Button variant="outline" disabled>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading...
+          </Button>
+        ) : user ? (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-right">
+              <span className="font-semibold">{user.name}</span>
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={user.avatarUrl} alt={user.name} />
+                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+            </div>
+            <Button variant="ghost" onClick={signOut}>
+              <LogOut className="mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={signIn}>
+            <LogIn className="mr-2" />
+            Login with Google
+          </Button>
+        )}
+      </div>
+
       <div className="flex flex-col items-center justify-center text-center">
         <AppLogo className="mb-4 h-20 w-20 text-primary" />
         <h1 className="font-headline text-5xl font-bold tracking-tighter md:text-7xl">
@@ -162,12 +191,7 @@ export default function Home() {
           </form>
         </Card>
       </div>
-
-      {!user && !authLoading && (
-        <p className="mt-8 text-muted-foreground">
-          Note: A Google account is used for identification in the game.
-        </p>
-      )}
     </main>
   );
 }
+    
