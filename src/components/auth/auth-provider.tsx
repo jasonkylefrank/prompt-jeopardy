@@ -5,7 +5,6 @@ import { useFirebase } from '@/firebase';
 import { createContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { User } from '@/lib/types';
 import {
-  getRedirectResult,
   signInWithRedirect,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
@@ -32,33 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Consume the stable user state from the main FirebaseProvider
   const { auth, user: firebaseUser, isUserLoading } = useFirebase();
   const { toast } = useToast();
-
-  useEffect(() => {
-    // This effect should only run once when auth is available to handle the redirect result.
-    if (auth && !isUserLoading) {
-      getRedirectResult(auth)
-        .then((result) => {
-          if (result) {
-            // User successfully signed in.
-            toast({
-              title: "Signed In",
-              description: `Welcome back, ${result.user.displayName}!`,
-            });
-          }
-        })
-        .catch((error) => {
-          // Handle errors here.
-          console.error('Login failed after redirect:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Login Failed',
-            description:
-              'There was a problem signing in with Google. Please try again.',
-          });
-        });
-    }
-  }, [auth, isUserLoading, toast]); // Dependencies ensure this runs at the right time
-
+  
   const user: User | null = useMemo(() => {
     if (!firebaseUser) return null;
     return {
@@ -94,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, isUserLoading, firebaseUser]
+    [user, isUserLoading, firebaseUser, auth]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

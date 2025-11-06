@@ -1,16 +1,25 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, {
+  DependencyList,
+  createContext,
+  useContext,
+  ReactNode,
+  useMemo,
+  useState,
+  useEffect,
+} from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { Auth, User, onAuthStateChanged, getRedirectResult, GoogleAuthProvider } from 'firebase/auth';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { useToast } from '@/hooks/use-toast';
 
 interface FirebaseProviderProps {
   children: ReactNode;
   firebaseApp: FirebaseApp | null; // Allow null
-  firestore: Firestore | null;   // Allow null
-  auth: Auth | null;             // Allow null
+  firestore: Firestore | null; // Allow null
+  auth: Auth | null; // Allow null
 }
 
 // Internal state for user authentication
@@ -47,7 +56,9 @@ export interface UserHookResult {
   userError: Error | null;
 }
 
-export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
+export const FirebaseContext = createContext<FirebaseContextState | undefined>(
+  undefined
+);
 
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -60,6 +71,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true, // Start loading until first auth event
     userError: null,
   });
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!auth) {
@@ -67,18 +79,51 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       return;
     }
 
+    // First, handle the redirect result. This should run only once.
+    getRedirectResult(auth)
+      .then(result => {
+        if (result) {
+          // This confirms the user has just signed in.
+          toast({
+            title: 'Signed In',
+            description: `Welcome back, ${result.user.displayName}!`,
+          });
+        }
+        // If result is null, it means the user is just visiting the page, not returning from a redirect.
+        // We don't need to do anything here, the onAuthStateChanged listener will handle it.
+      })
+      .catch(error => {
+        // Handle errors from the redirect.
+        console.error('Login failed after redirect:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description:
+            'There was a problem signing in with Google. Please try again.',
+        });
+      });
+    
+    // Then, set up the listener for ongoing auth state changes.
     const unsubscribe = onAuthStateChanged(
       auth,
-      (firebaseUser) => {
-        setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
+      firebaseUser => {
+        setUserAuthState({
+          user: firebaseUser,
+          isUserLoading: false,
+          userError: null,
+        });
       },
-      (error) => {
-        console.error("FirebaseProvider: onAuthStateChanged error:", error);
-        setUserAuthState({ user: null, isUserLoading: false, userError: error });
+      error => {
+        console.error('FirebaseProvider: onAuthStateChanged error:', error);
+        setUserAuthState({
+          user: null,
+          isUserLoading: false,
+          userError: error,
+        });
       }
     );
     return () => unsubscribe();
-  }, [auth]);
+  }, [auth, toast]);
 
   const contextValue = useMemo((): FirebaseContextState => {
     const servicesAvailable = !!(firebaseApp && firestore && auth);
@@ -107,7 +152,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   if (context === undefined) {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
-  
+
   return {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
@@ -118,7 +163,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   };
 };
 
-export const useAuth = (): Auth | null => {
+export const useAuthContext = (): Auth | null => {
   const { auth } = useFirebase();
   return auth;
 };
@@ -133,14 +178,17 @@ export const useFirebaseApp = (): FirebaseApp | null => {
   return firebaseApp;
 };
 
-type MemoFirebase <T> = T & {__memo?: boolean};
+type MemoFirebase<T> = T & { __memo?: boolean };
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
+export function useMemoFirebase<T>(
+  factory: () => T,
+  deps: DependencyList
+): T | MemoFirebase<T> {
   const memoized = useMemo(factory, deps);
-  
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
+
+  if (typeof memoized !== 'object' || memoized === null) return memoized;
   (memoized as MemoFirebase<T>).__memo = true;
-  
+
   return memoized;
 }
 
