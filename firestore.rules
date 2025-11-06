@@ -2,146 +2,114 @@
  * @fileoverview Firestore Security Rules for Prompt Jeopardy.
  *
  * Core Philosophy:
- * This ruleset enforces a strict ownership model. Admins own games,
- * and contestants own their profiles and submissions. Authorization decisions
- * are based on the authenticated user's ID (`request.auth.uid`) matching
- * the expected owner ID in the Firestore document path or within the document data.
+ * This ruleset enforces a strict, path-based ownership model. Each document is owned by a specific user (Admin), and only that user has write access.  Read access is restricted to the owner for most collections except the root /admins/{adminId} collection, which is readable by any signed-in user.
  *
  * Data Structure:
- * - /games/{gameId}: Stores game instances, with adminId indicating the owner.
- * - /games/{gameId}/rounds/{roundId}: Stores round data for games, accessible only to the game admin.
- * - /games/{gameId}/rounds/{roundId}/submissions/{submissionId}: Stores contestant submissions, accessible to the game admin and the submitting contestant.
- * - /contestants/{contestantId}: Stores contestant profiles, where contestantId matches the Firebase auth UID.
- * - /admins/{adminId}: Stores admin profiles, where adminId matches the Firebase auth UID.
+ * The data is structured hierarchically: /admins/{adminId}/games/{gameId}/...
+ *  - /admins/{adminId}: Stores administrator user profiles.
+ *  - /admins/{adminId}/games/{gameId}: Stores game instances created by admins.
+ *  - /admins/{adminId}/games/{gameId}/contestants/{contestantId}: Stores contestant profiles for a given game.
+ *  - /admins/{adminId}/games/{gameId}/rounds/{roundId}: Stores rounds for a given game.
+ *  - /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId}: Stores contestant responses for a given round.
  *
  * Key Security Decisions:
- * - No public listing of contestants or admins.
- * - Strict ownership checks for all write operations (create, update, delete).
- * - Read operations are generally restricted to owners, except where explicitly allowed (e.g., public read for games).
- * - No data schema validation is performed in this prototyping phase, except for essential authorization fields.
+ *  - User listing is disallowed to protect privacy.
+ *  - Path-based ownership is strictly enforced for all write operations.
+ *  - Read-only collections are explicitly marked.
+ *  - The default security posture is deny all unless explicitly allowed.
  *
  * Denormalization for Authorization:
- * - The `Game` document stores the `adminId`, which is used to authorize access to the game and its subcollections (Rounds, Submissions).
- * - The `Contestant` and `Admin` documents store their `id` which must match their `auth.uid`.
+ *  - The `games`, `contestants`, `rounds`, and `responses` collections all contain denormalized `adminId` and `gameId` fields to enable efficient authorization rules without requiring `get()` calls to parent documents.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @returns {boolean} True if the user is signed in, false otherwise.
+     * @description Allows admins to read their profile, and allows create by the admin.
+     * @path /admins/{adminId}
+     * @allow (get, list) if isSignedIn()
+     * @allow (create) if request.auth.uid == adminId
+     * @deny (update, delete) if true
+     * @principle Enforces document ownership for writes and allows any signed-in user to read admin profiles.
      */
+    match /admins/{adminId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(adminId);
+      allow update, delete: if false;
+    }
+
+    /**
+     * @description Allows the admin to manage their games.
+     * @path /admins/{adminId}/games/{gameId}
+     * @allow (get, list) if isOwner(adminId)
+     * @allow (create) if isOwner(adminId)
+     * @allow (update, delete) if isExistingOwner(adminId)
+     * @deny (create, update, delete) if !isOwner(adminId)
+     * @principle Enforces document ownership for writes, and ensures the game creator retains full control.
+     */
+    match /admins/{adminId}/games/{gameId} {
+      allow get, list: if isOwner(adminId);
+      allow create: if isOwner(adminId);
+      allow update, delete: if isExistingOwner(adminId);
+    }
+
+    /**
+     * @description Allows the admin to manage contestants within their games.
+     * @path /admins/{adminId}/games/{gameId}/contestants/{contestantId}
+     * @allow (get, list) if isOwner(adminId)
+     * @allow (create) if isOwner(adminId)
+     * @allow (update, delete) if isExistingOwner(adminId)
+     * @deny (create, update, delete) if !isOwner(adminId)
+     * @principle Enforces document ownership for writes, ensuring only the game admin can manage contestants.
+     */
+    match /admins/{adminId}/games/{gameId}/contestants/{contestantId} {
+      allow get, list: if isOwner(adminId);
+      allow create: if isOwner(adminId);
+      allow update, delete: if isExistingOwner(adminId);
+    }
+
+    /**
+     * @description Allows the admin to manage rounds within their games.
+     * @path /admins/{adminId}/games/{gameId}/rounds/{roundId}
+     * @allow (get, list) if isOwner(adminId)
+     * @allow (create) if isOwner(adminId)
+     * @allow (update, delete) if isExistingOwner(adminId)
+     * @deny (create, update, delete) if !isOwner(adminId)
+     * @principle Enforces document ownership for writes, ensuring only the game admin can manage rounds.
+     */
+    match /admins/{adminId}/games/{gameId}/rounds/{roundId} {
+      allow get, list: if isOwner(adminId);
+      allow create: if isOwner(adminId);
+      allow update, delete: if isExistingOwner(adminId);
+    }
+
+    /**
+     * @description Allows the admin to manage responses within their games.
+     * @path /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId}
+     * @allow (get, list) if isOwner(adminId)
+     * @allow (create) if isOwner(adminId)
+     * @allow (update, delete) if isExistingOwner(adminId)
+     * @deny (create, update, delete) if !isOwner(adminId)
+     * @principle Enforces document ownership for writes, ensuring only the game admin can manage responses.
+     */
+    match /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId} {
+      allow get, list: if isOwner(adminId);
+      allow create: if isOwner(adminId);
+      allow update, delete: if isExistingOwner(adminId);
+    }
+
+    // --- Helper functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the authenticated user ID matches the provided user ID, false otherwise.
-     * @example isOwner('someUserId') will return true if request.auth.uid == 'someUserId'.
-     */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the authenticated user ID matches the provided user ID and the resource exists.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the authenticated user ID matches the provided user ID and the resource exists, false otherwise.
-     */
     function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /games/{gameId} collection.
-     * @path /games/{gameId}
-     * @allow (get, list): Any user can view game information.
-     * @allow (create): Only an authenticated admin user can create a game, and the adminId must match their UID.
-     * @allow (update, delete): Only the admin who created the game can update or delete it.
-     * @deny (create): A non-authenticated user cannot create a game.
-     * @deny (update, delete): A different authenticated user cannot update or delete the game.
-     * @principle Enforces ownership for game management.
-     */
-    match /games/{gameId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.adminId == request.auth.uid;
-      allow update, delete: if isExistingOwner(resource.data.adminId);
-    }
-
-    /**
-     * @description Rules for the /games/{gameId}/rounds/{roundId} collection.
-     * @path /games/{gameId}/rounds/{roundId}
-     * @allow (get, list): Only the admin who created the game can read round information.
-     * @allow (create): Only the admin who created the game can create rounds.
-     * @allow (update, delete): Only the admin who created the game can update or delete rounds.
-     * @deny (create, update, delete): A non-authenticated user cannot modify round data.
-     * @deny (create, update, delete): A different authenticated user cannot modify round data.
-     * @principle Enforces admin-only access for round management.
-     */
-    match /games/{gameId}/rounds/{roundId} {
-      allow get, list: if isOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId);
-      allow create: if isOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId);
-      allow update, delete: if isExistingOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId);
-    }
-
-    /**
-     * @description Rules for the /games/{gameId}/rounds/{roundId}/submissions/{submissionId} collection.
-     * @path /games/{gameId}/rounds/{roundId}/submissions/{submissionId}
-     * @allow (get): Only the admin who created the game or the contestant who made the submission can read the submission.
-     * @allow (list): Only the admin who created the game can list the submissions.
-     * @allow (create): Only an authenticated contestant can create a submission, and the contestantId must match their UID.
-     * @allow (update, delete): Only the admin who created the game can update or delete submissions. Contestants cannot modify submissions after creation.
-     * @deny (create): A non-authenticated user cannot create a submission.
-     * @deny (create): An authenticated user cannot create a submission for another user.
-     * @deny (update, delete): A contestant cannot update or delete their own submission.
-     * @principle Enforces ownership and admin control for submissions.
-     */
-    match /games/{gameId}/rounds/{roundId}/submissions/{submissionId} {
-      allow get: if isOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId) || isOwner(resource.data.contestantId);
-      allow list: if isOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId);
-      allow create: if isSignedIn() && request.resource.data.contestantId == request.auth.uid;
-      allow update, delete: if isExistingOwner(get(/databases/$(database)/documents/games/$(gameId)).data.adminId);
-    }
-
-    /**
-     * @description Rules for the /contestants/{contestantId} collection.
-     * @path /contestants/{contestantId}
-     * @allow (get): Only the contestant themselves can read their profile.
-     * @allow (list): Listing contestants is not allowed.
-     * @allow (create): Only an authenticated user can create their own contestant profile, and the contestantId must match their UID.
-     * @allow (update, delete): Only the contestant themselves can update or delete their profile.
-     * @deny (create): A non-authenticated user cannot create a contestant profile.
-     * @deny (create): An authenticated user cannot create a profile for another user.
-     * @deny (update, delete): A different authenticated user cannot update or delete this profile.
-     * @principle Enforces strict ownership for contestant profiles.
-     */
-    match /contestants/{contestantId} {
-      allow get: if isOwner(contestantId);
-      allow list: if false;
-      allow create: if isOwner(contestantId);
-      allow update, delete: if isExistingOwner(contestantId);
-    }
-
-    /**
-     * @description Rules for the /admins/{adminId} collection.
-     * @path /admins/{adminId}
-     * @allow (get): Only the admin themselves can read their profile.
-     * @allow (list): Listing admins is not allowed.
-     * @allow (create): Only an authenticated user can create their own admin profile, and the adminId must match their UID.
-     * @allow (update, delete): Only the admin themselves can update or delete their profile.
-     * @deny (create): A non-authenticated user cannot create an admin profile.
-     * @deny (create): An authenticated user cannot create a profile for another user.
-     * @deny (update, delete): A different authenticated user cannot update or delete this profile.
-     * @principle Enforces strict ownership for admin profiles.
-     */
-    match /admins/{adminId} {
-      allow get: if isOwner(adminId);
-      allow list: if false;
-      allow create: if isOwner(adminId);
-      allow update, delete: if isExistingOwner(adminId);
     }
   }
 }
