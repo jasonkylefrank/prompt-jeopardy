@@ -1,14 +1,10 @@
 'use client';
 
-import { useContext } from 'react';
-import { AuthContext } from '@/components/auth/auth-provider';
+import { useAuth as useAuthFromProvider } from '@/components/auth-provider';
 
+/**
+ * @deprecated This hook is deprecated. Please import `useAuth` from `@/components/auth-provider` instead.
+ */
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-
-  return context;
+  return useAuthFromProvider();
 };
