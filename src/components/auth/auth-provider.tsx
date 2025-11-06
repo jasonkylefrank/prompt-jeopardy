@@ -35,33 +35,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handleRedirect = async () => {
+      if (!auth) return;
       try {
-        if (auth) {
-          // This function gets the result of the redirect operation.
-          const result = await getRedirectResult(auth);
-          // If the result is null, it means the user just landed on the page
-          // without having been redirected from the Google login screen.
-          if (result) {
-             toast({
-                title: "Signed In",
-                description: `Welcome back, ${result.user.displayName}!`,
-             });
-          }
+        const result = await getRedirectResult(auth);
+        if (result) {
+          toast({
+            title: "Signed In",
+            description: `Welcome back, ${result.user.displayName}!`,
+          });
         }
       } catch (error: any) {
-        console.error('Login failed:', error);
+        console.error('Login failed after redirect:', error);
         toast({
           variant: 'destructive',
           title: 'Login Failed',
           description:
-            'There was a problem signing in with Google. Please try again.',
+            'There was a problem signing in with Google after redirect. Please try again.',
         });
       }
     };
-    if (auth) {
+    
+    // Only run this on the initial load when auth is available
+    if (auth && !isUserLoading) {
       handleRedirect();
     }
-  }, [auth, toast]);
+  }, [auth, isUserLoading, toast]);
 
   const user: User | null = useMemo(() => {
     if (!firebaseUser) return null;
@@ -77,13 +75,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     if (!auth) return;
     const provider = new GoogleAuthProvider();
-    // We use signInWithRedirect, which is better for mobile and complex flows.
     await signInWithRedirect(auth, provider);
   };
 
   const signOut = async () => {
     if (!auth) return;
     await firebaseSignOut(auth);
+    toast({
+        title: "Signed Out",
+        description: "You have been successfully signed out.",
+    });
   };
 
   const value = useMemo(
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, isUserLoading, firebaseUser, signIn, signOut]
+    [user, isUserLoading, firebaseUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
