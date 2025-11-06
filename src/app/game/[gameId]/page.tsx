@@ -1,3 +1,4 @@
+
 import { getGameState } from "@/app/actions";
 import { ClientGameView } from "@/components/game/client-game-view";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,7 +11,9 @@ type GamePageProps = {
 };
 
 export default async function GamePage({ params }: GamePageProps) {
-  const game = await getGameState(params.gameId);
+  // In Next.js 15, params is a promise.
+  const resolvedParams = await Promise.resolve(params);
+  const game = await getGameState(resolvedParams.gameId);
 
   if (!game) {
     return (

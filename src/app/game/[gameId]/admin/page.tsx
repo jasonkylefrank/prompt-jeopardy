@@ -1,3 +1,4 @@
+
 import { getGameState } from "@/app/actions";
 import { ClientAdminView } from "@/components/game/client-admin-view";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,7 +14,9 @@ type AdminPageProps = {
 };
 
 export default async function AdminPage({ params }: AdminPageProps) {
-  const game = await getGameState(params.gameId);
+  // In Next.js 15, params is a promise.
+  const resolvedParams = await Promise.resolve(params);
+  const game = await getGameState(resolvedParams.gameId);
 
   if (!game) {
     return (
