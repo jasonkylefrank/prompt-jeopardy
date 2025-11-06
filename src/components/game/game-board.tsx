@@ -25,6 +25,9 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
     switch (game.status) {
       case "asking":
         const askerName = game.players[game.currentAskerId]?.name || "a player";
+        if (game.currentAskerId === currentUser.id) {
+          return "It's your turn to ask a question!";
+        }
         return `Waiting for ${askerName} to ask a question...`;
       case "responding":
         return "The AI is formulating its response...";
@@ -62,13 +65,14 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
           <Card className="min-h-[400px]">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">
-                Round {game.currentRound + 1}
+                Round {game.rounds.length}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {game.status === 'asking' && (
-                <div className="flex h-64 items-center justify-center text-muted-foreground">
-                    <p className="flex items-center gap-2"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-muted-foreground">
+                    <p className="flex items-center gap-2 text-2xl"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                    {game.currentAskerId !== currentUser.id && <p>Get ready for their question!</p>}
                 </div>
               )}
               {currentRound && game.status !== 'asking' && (

@@ -1,10 +1,13 @@
 
-"use server";
+'use server';
 
-import { revalidatePath } from "next/cache";
-import { getGame, saveGame } from "@/lib/db";
-import type { Game, Player, Submission } from "@/lib/types";
-import { generateLLMResponse as generateLLMResponseFlow } from "@/ai/flows/generate-llm-response";
+import { revalidatePath } from 'next/cache';
+import { getGame, saveGame } from '@/lib/db';
+import type { Game, Player, Submission } from '@/lib/types';
+import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
+// Import from server-side firebase setup
+import { firestore } from '@/firebase/server';
+import { doc, getDoc } from 'firebase/firestore';
 
 // --- GAME CREATION AND JOINING ---
 
@@ -19,7 +22,7 @@ export async function createGame(host: {
   const newGame: Game = {
     id: gameId,
     hostId: host.id,
-    status: "lobby",
+    status: 'lobby',
     players: {
       [host.id]: hostPlayer,
     },
@@ -38,13 +41,16 @@ export async function joinGame(
 ): Promise<{ success: boolean; message: string }> {
   const game = await getGame(gameId);
   if (!game) {
-    return { success: false, message: "Game not found." };
+    return { success: false, message: 'Game not found.' };
   }
 
-  if (game.status !== "lobby") {
-    return { success: false, message: "Game has already started." };
-  }
+  // Check if player is already in the game from a previous session
+  const playerDoc = await getDoc(doc(firestore, 'games', gameId, 'players', playerData.id));
 
+  if (!playerDoc.exists() && game.status !== 'lobby') {
+    return { success: false, message: 'Game has already started.' };
+  }
+  
   if (!game.players[playerData.id]) {
     game.players[playerData.id] = { ...playerData, score: 0 };
     await saveGame(game);
@@ -52,7 +58,7 @@ export async function joinGame(
 
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/admin`);
-  return { success: true, message: "Joined game." };
+  return { success: true, message: 'Joined game.' };
 }
 
 // --- GAME STATE MANAGEMENT ---
@@ -63,7 +69,7 @@ export async function getGameState(gameId: string): Promise<Game | null> {
 
 export async function advanceGameState(
   gameId: string,
-  newStatus: Game["status"]
+  newStatus: Game['status']
 ) {
   const game = await getGame(gameId);
   if (!game) return;
@@ -71,16 +77,25 @@ export async function advanceGameState(
   game.status = newStatus;
 
   // Logic for advancing rounds
-  if (newStatus === "asking") {
-    const playerIds = Object.keys(game.players);
-    const currentAskerIndex = playerIds.indexOf(game.currentAskerId);
-    const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
-    game.currentAskerId = playerIds[nextAskerIndex];
+  if (newStatus === 'asking') {
+    // Filter out the host before determining the next asker
+    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
+    
+    if (playerIds.length > 0) {
+      const currentAskerIndex = playerIds.indexOf(game.currentAskerId);
+      const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
+      game.currentAskerId = playerIds[nextAskerIndex];
 
-    if (nextAskerIndex === 0) {
-      game.currentRound += 1;
+      // Increment round only when it cycles back to the first player
+      if (nextAskerIndex === 0) {
+        game.currentRound += 1;
+      }
+    } else {
+      // If only the host is present, they become the asker.
+      game.currentAskerId = game.hostId;
     }
   }
+
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
@@ -100,14 +115,12 @@ export async function submitQuestion(
   const game = await getGame(gameId);
   if (!game) return;
 
-  game.status = "responding";
+  game.status = 'responding';
   const newRound = {
-    roundNumber: game.currentRound + 1,
+    roundNumber: game.rounds.length, // use length for 0-based index
     questionAskerId: game.currentAskerId,
     question,
-    persona,
-    action,
-    llmResponse: "",
+    llmResponse: '',
     submissions: {},
     isScored: false,
     correctAnswer: { persona, action },
@@ -128,19 +141,19 @@ async function generateAndSaveLLMResponse(
   persona: string,
   action: string
 ) {
-  const game = await getGame(gameId);
-  if (!game) return;
-
   const llmResult = await generateLLMResponseFlow({
     question,
     persona,
     action,
   });
 
+  const game = await getGame(gameId);
+  if (!game) return;
+
   const currentRound = game.rounds[game.rounds.length - 1];
   if (currentRound) {
     currentRound.llmResponse = llmResult.response;
-    game.status = "answering";
+    game.status = 'answering';
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/admin`);
@@ -153,7 +166,7 @@ export async function submitAnswer(
   submission: Submission
 ) {
   const game = await getGame(gameId);
-  if (!game || game.status !== "answering") return;
+  if (!game || game.status !== 'answering') return;
 
   const currentRound = game.rounds[game.rounds.length - 1];
   if (currentRound && !currentRound.submissions[playerId]) {
@@ -191,8 +204,8 @@ export async function scoreRound(gameId: string) {
   });
 
   currentRound.isScored = true;
-  game.status = "scoring";
+  game.status = 'scoring';
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/dmin`);
+  revalidatePath(`/game/${gameId}/admin`);
 }

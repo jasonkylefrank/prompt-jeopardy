@@ -43,9 +43,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
 
 export function ClientAdminView({ initialGame }: { initialGame: Game }) {
   const { game } = useGameState(initialGame);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -94,6 +96,29 @@ export function ClientAdminView({ initialGame }: { initialGame: Game }) {
       description: "Game link has been copied to your clipboard.",
     });
   };
+  
+  const isHost = user?.id === game.hostId;
+
+  if (!isHost) {
+    return (
+        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
+            <AppLogo className="h-20 w-20 text-primary" />
+            <Card className="max-w-lg text-center">
+                <CardHeader>
+                    <CardTitle className="font-headline">Access Denied</CardTitle>
+                    <CardDescription>
+                        Only the host can access the admin dashboard.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild>
+                        <Link href={`/game/${game.id}`}>Go to Game</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8">
@@ -142,7 +167,7 @@ export function ClientAdminView({ initialGame }: { initialGame: Game }) {
               {game.status === "asking" && (
                  <div className="space-y-4 rounded-lg border p-4">
                     <h3 className="font-semibold">
-                      Round {game.currentRound + 1}: Ask a Question
+                      Round {game.currentRound}: Ask a Question
                     </h3>
                     <p>Current Asker: <span className="font-bold">{game.players[game.currentAskerId]?.name || ''}</span></p>
                     <Textarea placeholder="Enter the contestant's question here..." value={question} onChange={e => setQuestion(e.target.value)} />

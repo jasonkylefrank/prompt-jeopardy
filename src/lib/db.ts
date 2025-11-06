@@ -1,19 +1,22 @@
-// MOCK DATABASE for demonstration purposes.
-// In a real application, you would replace this with a connection to a database like Firestore.
-// This in-memory store will be reset on every server restart.
-
+import {
+  doc,
+  getDoc,
+  setDoc,
+} from 'firebase/firestore';
+// Use the new server-side firestore instance
+import { firestore } from '@/firebase/server';
 import type { Game } from './types';
 
-const games: Record<string, Game> = {};
-
 export async function getGame(id: string): Promise<Game | null> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 50));
-  return games[id] ? JSON.parse(JSON.stringify(games[id])) : null;
+  const gameDocRef = doc(firestore, 'games', id);
+  const gameDoc = await getDoc(gameDocRef);
+  if (!gameDoc.exists()) {
+    return null;
+  }
+  return gameDoc.data() as Game;
 }
 
 export async function saveGame(game: Game): Promise<void> {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 50));
-  games[game.id] = JSON.parse(JSON.stringify(game));
+  const gameDocRef = doc(firestore, 'games', game.id);
+  await setDoc(gameDocRef, game, { merge: true });
 }
