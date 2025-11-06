@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useContext } from "react";
@@ -8,28 +9,26 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
 } from "firebase/auth";
-import { useFirebaseApp } from "@/firebase";
+import { useFirebase } from "@/firebase";
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  const app = useFirebaseApp();
+  const { auth } = useFirebase();
 
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
 
   const signIn = async () => {
-    const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
+    // We don't need to get a new auth instance, useFirebase() provides it.
     await signInWithRedirect(auth, provider);
   };
 
   const signOut = async () => {
-    const auth = getAuth(app);
+    // We don't need to get a new auth instance, useFirebase() provides it.
     await firebaseSignOut(auth);
   };
 
   return { ...context, signIn, signOut };
 };
-
-    

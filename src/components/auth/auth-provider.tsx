@@ -1,7 +1,8 @@
+
 "use client";
 
 import type { User as FirebaseUser } from "firebase/auth";
-import { useUser } from "@/firebase/provider";
+import { useUser } from "@/firebase";
 import { createContext, useMemo, type ReactNode } from "react";
 import type { User } from "@/lib/types";
 
@@ -40,5 +41,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-    
