@@ -49,41 +49,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // This effect runs only once on mount.
+    // This effect runs only once on mount to set up the auth state listener
+    // and process the sign-in redirect result.
     
-    // First, process the redirect result. This is critical for post-login flow.
+    // First, process any pending redirect result.
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
-          // User successfully signed in or linked.
+          // This means a user has just signed in via redirect.
+          // onAuthStateChanged will handle setting the user state.
+          console.log("Redirect result processed. User:", result.user.displayName);
           toast({
             title: 'Signed In',
             description: `Welcome back, ${result.user.displayName}!`,
           });
         }
+        // If result is null, it means this is not a redirect sign-in,
+        // or the result has already been processed.
       })
       .catch((error) => {
-        console.error('Auth Error from getRedirectResult:', error);
+        console.error('Error processing redirect result:', error);
         toast({
           variant: 'destructive',
           title: 'Login Failed',
-          description: 'There was a problem signing in. Please try again.',
+          description: error.message || 'There was a problem signing in. Please try again.',
         });
+      })
+      .finally(() => {
+        // After processing the redirect, set up the permanent auth state listener.
+        // This will fire with the user from the redirect (if any) or the existing session.
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          console.log("onAuthStateChanged fired. User:", user ? user.uid : null);
+          setFirebaseUser(user);
+          setLoading(false);
+        }, (error) => {
+          console.error('Auth state listener error:', error);
+          setFirebaseUser(null);
+          setLoading(false);
+        });
+        
+        // Return the unsubscribe function to be called on component unmount.
+        return () => unsubscribe();
       });
 
-    // Then, set up the state change listener. This will fire after getRedirectResult
-    // and for any other auth state changes.
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setLoading(false);
-    }, (error) => {
-      console.error('Auth Error from onAuthStateChanged:', error);
-      setFirebaseUser(null);
-      setLoading(false);
-    });
-
-    // Cleanup listener on unmount
-    return () => unsubscribe();
+  // The empty dependency array ensures this effect runs only once on component mount.
   }, [toast]);
   
   const user: User | null = useMemo(() => {
