@@ -81,15 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async () => {
     const provider = new GoogleAuthProvider()
     try {
-      const result = await signInWithPopup(auth, provider)
-      // onAuthStateChanged will handle the user state update.
-      toast({
-        title: "Signed In",
-        description: `Welcome back, ${result.user.displayName}!`,
-      })
+      // The onAuthStateChanged listener will handle the user state update automatically.
+      await signInWithPopup(auth, provider)
     } catch (error: any) {
       console.error("Error during sign-in:", error)
-      // Don't show a toast for user-closed popups
+      // We don't want to show a scary error toast if the user simply closes the popup.
       if (error.code !== "auth/popup-closed-by-user") {
         toast({
           variant: "destructive",
