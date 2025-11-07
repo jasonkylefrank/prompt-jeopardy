@@ -1,115 +1,13 @@
-/**
- * @fileoverview Firestore Security Rules for Prompt Jeopardy.
- *
- * Core Philosophy:
- * This ruleset enforces a strict, path-based ownership model. Each document is owned by a specific user (Admin), and only that user has write access.  Read access is restricted to the owner for most collections except the root /admins/{adminId} collection, which is readable by any signed-in user.
- *
- * Data Structure:
- * The data is structured hierarchically: /admins/{adminId}/games/{gameId}/...
- *  - /admins/{adminId}: Stores administrator user profiles.
- *  - /admins/{adminId}/games/{gameId}: Stores game instances created by admins.
- *  - /admins/{adminId}/games/{gameId}/contestants/{contestantId}: Stores contestant profiles for a given game.
- *  - /admins/{adminId}/games/{gameId}/rounds/{roundId}: Stores rounds for a given game.
- *  - /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId}: Stores contestant responses for a given round.
- *
- * Key Security Decisions:
- *  - User listing is disallowed to protect privacy.
- *  - Path-based ownership is strictly enforced for all write operations.
- *  - Read-only collections are explicitly marked.
- *  - The default security posture is deny all unless explicitly allowed.
- *
- * Denormalization for Authorization:
- *  - The `games`, `contestants`, `rounds`, and `responses` collections all contain denormalized `adminId` and `gameId` fields to enable efficient authorization rules without requiring `get()` calls to parent documents.
- */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Allows admins to read their profile, and allows create by the admin.
-     * @path /admins/{adminId}
-     * @allow (get, list) if isSignedIn()
-     * @allow (create) if request.auth.uid == adminId
-     * @deny (update, delete) if true
-     * @principle Enforces document ownership for writes and allows any signed-in user to read admin profiles.
-     */
-    match /admins/{adminId} {
-      allow get, list: if isSignedIn();
-      allow create: if isOwner(adminId);
-      allow update, delete: if false;
-    }
-
-    /**
-     * @description Allows the admin to manage their games.
-     * @path /admins/{adminId}/games/{gameId}
-     * @allow (get, list) if isOwner(adminId)
-     * @allow (create) if isOwner(adminId)
-     * @allow (update, delete) if isExistingOwner(adminId)
-     * @deny (create, update, delete) if !isOwner(adminId)
-     * @principle Enforces document ownership for writes, and ensures the game creator retains full control.
-     */
-    match /admins/{adminId}/games/{gameId} {
-      allow get, list: if isOwner(adminId);
-      allow create: if isOwner(adminId);
-      allow update, delete: if isExistingOwner(adminId);
-    }
-
-    /**
-     * @description Allows the admin to manage contestants within their games.
-     * @path /admins/{adminId}/games/{gameId}/contestants/{contestantId}
-     * @allow (get, list) if isOwner(adminId)
-     * @allow (create) if isOwner(adminId)
-     * @allow (update, delete) if isExistingOwner(adminId)
-     * @deny (create, update, delete) if !isOwner(adminId)
-     * @principle Enforces document ownership for writes, ensuring only the game admin can manage contestants.
-     */
-    match /admins/{adminId}/games/{gameId}/contestants/{contestantId} {
-      allow get, list: if isOwner(adminId);
-      allow create: if isOwner(adminId);
-      allow update, delete: if isExistingOwner(adminId);
-    }
-
-    /**
-     * @description Allows the admin to manage rounds within their games.
-     * @path /admins/{adminId}/games/{gameId}/rounds/{roundId}
-     * @allow (get, list) if isOwner(adminId)
-     * @allow (create) if isOwner(adminId)
-     * @allow (update, delete) if isExistingOwner(adminId)
-     * @deny (create, update, delete) if !isOwner(adminId)
-     * @principle Enforces document ownership for writes, ensuring only the game admin can manage rounds.
-     */
-    match /admins/{adminId}/games/{gameId}/rounds/{roundId} {
-      allow get, list: if isOwner(adminId);
-      allow create: if isOwner(adminId);
-      allow update, delete: if isExistingOwner(adminId);
-    }
-
-    /**
-     * @description Allows the admin to manage responses within their games.
-     * @path /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId}
-     * @allow (get, list) if isOwner(adminId)
-     * @allow (create) if isOwner(adminId)
-     * @allow (update, delete) if isExistingOwner(adminId)
-     * @deny (create, update, delete) if !isOwner(adminId)
-     * @principle Enforces document ownership for writes, ensuring only the game admin can manage responses.
-     */
-    match /admins/{adminId}/games/{gameId}/rounds/{roundId}/responses/{responseId} {
-      allow get, list: if isOwner(adminId);
-      allow create: if isOwner(adminId);
-      allow update, delete: if isExistingOwner(adminId);
-    }
-
-    // --- Helper functions ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+    // WARNING: These rules are permissive and are intended for development purposes only.
+    // They allow any client to read and write to the database.
+    // You should secure your database before deploying to production.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
