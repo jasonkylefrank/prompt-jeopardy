@@ -165,31 +165,6 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   
   const isHost = user?.id === game.hostId;
 
-  if (!user) {
-    return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
-  }
-
-  if (!isHost) {
-    return (
-        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
-            <AppLogo className="h-20 w-20 text-primary" />
-            <Card className="max-w-lg text-center">
-                <CardHeader>
-                    <CardTitle className="font-headline">Access Denied</CardTitle>
-                    <CardDescription>
-                        Only the host can access this dashboard.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button asChild>
-                        <Link href={`/game/${game.id}`}>Go to Game</Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
-    )
-  }
-  
   const renderRoundSetup = (title: string) => {
     return (
       <div className="space-y-4 rounded-lg border p-4">
@@ -236,6 +211,30 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     );
   };
 
+  if (!user) {
+    return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
+  }
+
+  if (!isHost) {
+    return (
+        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
+            <AppLogo className="h-20 w-20 text-primary" />
+            <Card className="max-w-lg text-center">
+                <CardHeader>
+                    <CardTitle className="font-headline">Access Denied</CardTitle>
+                    <CardDescription>
+                        Only the host can access this dashboard.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild>
+                        <Link href={`/game/${game.id}`}>Go to Game</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8">
@@ -336,7 +335,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                   <CardDescription>
                     See who has submitted their answers for Round {currentRound.roundNumber}.
                   </CardDescription>
-                </Header>
+                </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {players.map(player => (
@@ -390,3 +389,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    
