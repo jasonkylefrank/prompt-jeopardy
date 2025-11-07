@@ -12,19 +12,9 @@ import { FirestorePermissionError } from '@/firebase/errors';
 // This function was moved from `lib/db.ts` to `actions.ts` to resolve a server/client module conflict.
 export async function saveGame(game: Game): Promise<void> {
   const gameDocRef = doc(firestore, 'games', game.id);
-  try {
-    await setDoc(gameDocRef, game, { merge: true });
-  } catch (error) {
-    if (error instanceof FirestoreError && error.code === 'permission-denied') {
-      const contextualError = new FirestorePermissionError({
-        operation: 'write', // Covers create and update
-        path: gameDocRef.path,
-        requestResourceData: game,
-      });
-      errorEmitter.emit('permission-error', contextualError);
-    }
-     // We don't re-throw here to avoid crashing the server action
-  }
+  // No try-catch block here. Let errors propagate up to the caller in server actions.
+  // The non-blocking error handling is for client-side operations.
+  await setDoc(gameDocRef, game, { merge: true });
 }
 
 // --- GAME CREATION AND JOINING ---
