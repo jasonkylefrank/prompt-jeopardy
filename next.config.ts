@@ -36,6 +36,22 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     '*.cloudworkstations.dev',
   ],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Ensures HMR works correctly in this environment
+      config.watchOptions.poll = 300;
+      config.devServer = {
+        ...(config.devServer || {}),
+        webSocketURL: {
+          protocol: 'wss',
+          port: 443,
+          hostname: process.env.NEXT_PUBLIC_HOST_URL?.split('//')[1] || 'localhost',
+          pathname: '/_next/webpack-hmr',
+        },
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
