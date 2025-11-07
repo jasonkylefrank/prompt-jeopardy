@@ -4,30 +4,27 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { useFirebase } from '@/firebase';
 import { createContext, useEffect, useMemo, type ReactNode } from 'react';
 import type { User } from '@/lib/types';
-import {
-  signInWithRedirect,
-  GoogleAuthProvider,
-  signOut as firebaseSignOut,
-} from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   firebaseUser: FirebaseUser | null;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signIn: () => void;
+  signOut: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   firebaseUser: null,
-  signIn: async () => {},
-  signOut: async () => {},
+  signIn: () => {},
+  signOut: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   // Consume the stable user state from the main FirebaseProvider
   const { auth, user: firebaseUser, isUserLoading } = useFirebase();
   const { toast } = useToast();
@@ -43,21 +40,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [firebaseUser]);
 
-  const signIn = async () => {
-    if (!auth) return;
-    const provider = new GoogleAuthProvider();
-    // Start the sign-in process
-    await signInWithRedirect(auth, provider);
+  const signIn = () => {
+    // Redirect to the server-side sign-in route
+    router.push('/api/auth/signin');
   };
 
-  const signOut = async () => {
-    if (!auth) return;
-    await firebaseSignOut(auth);
-    toast({
-        title: "Signed Out",
-        description: "You have been successfully signed out.",
-    });
+  const signOut = () => {
+    // Redirect to the server-side sign-out route
+    router.push('/api/auth/signout');
   };
+
+  useEffect(() => {
+    if (!isUserLoading && firebaseUser) {
+        // This effect can be used to show a welcome toast, etc.
+        // But we avoid showing a toast on every page load.
+    }
+  }, [isUserLoading, firebaseUser, toast]);
 
   const value = useMemo(
     () => ({
@@ -67,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, isUserLoading, firebaseUser, auth]
+    [user, isUserLoading, firebaseUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
