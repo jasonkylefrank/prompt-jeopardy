@@ -37,10 +37,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Initialize Firebase outside of the component to ensure it's only done once.
+// --- CRITICAL CHANGE: Initialize Firebase ONCE outside the component ---
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
 const auth = getAuth(firebaseApp)
 const firestore = getFirestore(firebaseApp)
+// --------------------------------------------------------------------
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Clean up the listener on component unmount.
     return () => unsubscribe()
-  }, [])
+  }, []) // Empty dependency array ensures this runs only once.
 
   const user: User | null = useMemo(() => {
     if (!firebaseUser) return null
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [user, firebaseUser, loading]
+    [user, firebaseUser, loading] // signIn and signOut are stable and don't need to be dependencies
   )
 
   return (
