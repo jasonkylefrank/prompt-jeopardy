@@ -12,6 +12,8 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
+  CommandSeparator,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -20,8 +22,13 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 
-type MultiSelectProps = {
+type Option = {
+  category: string;
   options: string[];
+}
+
+type MultiSelectProps = {
+  options: string[] | Option[];
   selected: string[];
   onChange: (selected: string[]) => void;
   className?: string;
@@ -43,6 +50,10 @@ export function MultiSelect({
       : [...selected, currentValue];
     onChange(newSelected);
   };
+
+  const isCategorized = (option: any): option is Option => {
+    return typeof option === 'object' && option !== null && 'category' in option && Array.isArray(option.options);
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -67,26 +78,54 @@ export function MultiSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder="Search..." />
           <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup className="max-h-60 overflow-auto">
-            {options.map((option) => (
-              <CommandItem
-                key={option}
-                onSelect={() => handleSelect(option)}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    selected.includes(option) ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                {option}
-              </CommandItem>
-            ))}
-          </CommandGroup>
+          <CommandList>
+            {options.map((option, index) => {
+              if (isCategorized(option)) {
+                return (
+                  <CommandGroup key={option.category} heading={option.category}>
+                    {option.options.map((item) => (
+                      <CommandItem
+                        key={item}
+                        onSelect={() => handleSelect(item)}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selected.includes(item)
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                        {item}
+                      </CommandItem>
+                    ))}
+                    {index < options.length - 1 && <CommandSeparator />}
+                  </CommandGroup>
+                )
+              }
+              if (typeof option === 'string') {
+                 return (
+                    <CommandItem
+                        key={option}
+                        onSelect={() => handleSelect(option)}
+                    >
+                        <Check
+                        className={cn(
+                            "mr-2 h-4 w-4",
+                            selected.includes(option) ? "opacity-100" : "opacity-0"
+                        )}
+                        />
+                        {option}
+                    </CommandItem>
+                )
+              }
+              return null;
+            })}
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>

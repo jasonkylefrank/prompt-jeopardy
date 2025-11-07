@@ -1,16 +1,32 @@
+
 export const PERSONAS = [
-  "Michael Jordan",
-  "Mike Tyson",
-  "Hulk Hogan",
-  "The Rock",
-  "Taylor Swift",
-  "Leonardo da Vinci",
-  "Abraham Lincoln",
-  "Jane Goodall",
-  "Helen Keller",
-  "Amelia Earhart",
-  "Bill Clinton",
-  "George Bush",
+  {
+    category: "Sports & entertainment",
+    options: [
+      "Michael Jordan",
+      "Mike Tyson",
+      "Hulk Hogan",
+      "The Rock",
+      "Taylor Swift",
+    ],
+  },
+  {
+    category: "Historical",
+    options: [
+      "Leonardo da Vinci",
+      "Abraham Lincoln",
+      "Jane Goodall",
+      "Helen Keller",
+      "Amelia Earhart",
+    ],
+  },
+  {
+    category: "Political",
+    options: [
+      "Bill Clinton",
+      "George Bush",
+    ],
+  },
 ];
 
 export const ACTIONS = [

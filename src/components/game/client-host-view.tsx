@@ -164,6 +164,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   };
   
   const isHost = user?.id === game.hostId;
+  const allPersonas = PERSONAS.flatMap(p => p.options);
 
   if (!user) {
     return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
@@ -376,5 +377,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    
