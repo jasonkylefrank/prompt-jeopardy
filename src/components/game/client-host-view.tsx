@@ -56,10 +56,14 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
 
   const [persona, setPersona] = useState(game.liveQuestion.persona || "");
   const [action, setAction] = useState(game.liveQuestion.action || "");
-  
-  const allPersonas = PERSONAS.flatMap(p => p.options);
-  const [personaPool, setPersonaPool] = useState<string[]>(game.liveQuestion.personaPool || []);
-  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || ACTIONS);
+
+  const [personaPool, setPersonaPool] = useState<string[]>(
+    game.liveQuestion.personaPool || []
+  );
+  const [actionPool, setActionPool] = useState<string[]>(
+    game.liveQuestion.actionPool?.length ? game.liveQuestion.actionPool : ACTIONS
+  );
+
 
   useEffect(() => {
     const storedPlayer = sessionStorage.getItem("player");
@@ -391,3 +395,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    
