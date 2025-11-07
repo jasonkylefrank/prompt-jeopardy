@@ -25,7 +25,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
   const [gameId, setGameId] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [dialogAction, setDialogAction] = useState<"create" | "join" | null>(
@@ -33,6 +34,7 @@ export default function Home() {
   );
 
   const handleCreateClick = () => {
+    setCreateError(null);
     setDialogAction("create");
     setIsNameDialogOpen(true);
   };
@@ -40,10 +42,10 @@ export default function Home() {
   const handleJoinClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!gameId) {
-      setError("Please enter a Game ID.");
+      setJoinError("Please enter a Game ID.");
       return;
     }
-    setError(null);
+    setJoinError(null);
     setDialogAction("join");
     setIsNameDialogOpen(true);
   };
@@ -62,7 +64,7 @@ export default function Home() {
         sessionStorage.setItem("player", JSON.stringify(player));
         router.push(`/game/${newGameId}/admin`);
       } catch (err) {
-        setError("Failed to create game. Please try again.");
+        setCreateError("Failed to create game. Please try again.");
         setLoading(false);
       }
     }
@@ -73,7 +75,7 @@ export default function Home() {
         const result = await joinGame(gameId.toUpperCase(), player);
 
         if (!result.success) {
-          setError(result.message);
+          setJoinError(result.message);
           setJoinLoading(false);
         } else {
           // Store user info for the session
@@ -81,7 +83,7 @@ export default function Home() {
           router.push(`/game/${gameId.toUpperCase()}`);
         }
       } catch (err) {
-        setError("Failed to join game. Please check the ID and try again.");
+        setJoinError("Failed to join game. Please check the ID and try again.");
         setJoinLoading(false);
       }
     }
@@ -118,11 +120,12 @@ export default function Home() {
                 Start a new game and invite your friends to play.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex-grow">
+            <CardContent className="flex-grow space-y-2">
               <p>
                 As the host, you&apos;ll control the game, choose the AI&apos;s
                 personality, and crown the winner.
               </p>
+              {createError && <p className="text-sm text-destructive">{createError}</p>}
             </CardContent>
             <CardFooter>
               <Button
@@ -163,7 +166,7 @@ export default function Home() {
                   maxLength={6}
                   required
                 />
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {joinError && <p className="text-sm text-destructive">{joinError}</p>}
               </CardContent>
               <CardFooter>
                 <Button

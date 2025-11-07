@@ -2,14 +2,30 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getGame, saveGame } from '@/lib/db';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-import { collection, getDocs, doc, getDoc, FirestoreError } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, setDoc, FirestoreError } from "firebase/firestore";
 import { firestore } from '@/firebase/server';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
+// This function was moved from `lib/db.ts` to `actions.ts` to resolve a server/client module conflict.
+export async function saveGame(game: Game): Promise<void> {
+  const gameDocRef = doc(firestore, 'games', game.id);
+  try {
+    await setDoc(gameDocRef, game, { merge: true });
+  } catch (error) {
+    if (error instanceof FirestoreError && error.code === 'permission-denied') {
+      const contextualError = new FirestorePermissionError({
+        operation: 'write', // Covers create and update
+        path: gameDocRef.path,
+        requestResourceData: game,
+      });
+      errorEmitter.emit('permission-error', contextualError);
+    }
+     // We don't re-throw here to avoid crashing the server action
+  }
+}
 
 // --- GAME CREATION AND JOINING ---
 
@@ -37,7 +53,7 @@ export async function joinGame(
   gameId: string,
   playerData: Omit<Player, 'score'>
 ): Promise<{ success: boolean; message: string }> {
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game) {
     return { success: false, message: 'Game not found.' };
   }
@@ -64,7 +80,24 @@ export async function joinGame(
 // --- GAME STATE MANAGEMENT ---
 
 export async function getGameState(gameId: string): Promise<Game | null> {
-  return await getGame(gameId);
+  const gameDocRef = doc(firestore, 'games', gameId);
+  try {
+    const gameDoc = await getDoc(gameDocRef);
+    if (!gameDoc.exists()) {
+      return null;
+    }
+    return gameDoc.data() as Game;
+  } catch (error) {
+    if (error instanceof FirestoreError && error.code === 'permission-denied') {
+      const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: gameDocRef.path,
+      });
+      errorEmitter.emit('permission-error', contextualError);
+    }
+    // Return null or re-throw a generic error if it's not a permission issue
+    return null;
+  }
 }
 
 export async function getAllGames(): Promise<Game[]> {
@@ -92,7 +125,7 @@ export async function advanceGameState(
   gameId: string,
   newStatus: Game['status']
 ) {
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game) return;
 
   game.status = newStatus;
@@ -135,7 +168,7 @@ export async function submitQuestion(
     action,
   }: { question: string; persona: string; action: string }
 ) {
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game) return;
 
   game.status = 'responding';
@@ -171,7 +204,7 @@ async function generateAndSaveLLMResponse(
     action,
   });
 
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game) return;
 
   const currentRound = game.rounds[game.rounds.length - 1];
@@ -190,7 +223,7 @@ export async function submitAnswer(
   playerId: string,
   submission: Submission
 ) {
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game || game.status !== 'answering') return;
 
   const currentRound = game.rounds[game.rounds.length - 1];
@@ -204,7 +237,7 @@ export async function submitAnswer(
 }
 
 export async function scoreRound(gameId: string) {
-  const game = await getGame(gameId);
+  const game = await getGameState(gameId);
   if (!game) return;
 
   const currentRound = game.rounds[game.rounds.length - 1];
