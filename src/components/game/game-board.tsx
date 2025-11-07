@@ -99,8 +99,13 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
         </div>
 
         <div className="lg:col-span-1">
-          {game.status === "answering" && !mySubmission && currentUser.id !== game.currentAskerId && (
-            <AnswerSelector gameId={game.id} playerId={currentUser.id} />
+          {game.status === "answering" && !mySubmission && currentUser.id !== game.currentAskerId && currentRound && (
+            <AnswerSelector 
+              gameId={game.id} 
+              playerId={currentUser.id} 
+              personaPool={currentRound.personaPool}
+              actionPool={currentRound.actionPool}
+            />
           )}
 
           {game.status !== "answering" || (game.status === "answering" && (mySubmission || currentUser.id === game.currentAskerId)) ? (

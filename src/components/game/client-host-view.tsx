@@ -4,6 +4,7 @@
 import {
   advanceGameState,
   scoreRound,
+  setRoundData,
   submitQuestion,
 } from "@/app/actions";
 import type { Game } from "@/lib/types";
@@ -39,11 +40,13 @@ import {
   Trophy,
   ChevronRight,
   Eye,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
 import Link from "next/link";
 import type { User } from "@/lib/types";
+import { MultiSelect } from "../ui/multi-select";
 
 export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const { game } = useGameState(initialGame);
@@ -51,8 +54,10 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const [persona, setPersona] = useState("");
-  const [action, setAction] = useState("");
+  const [persona, setPersona] = useState(game.liveQuestion.persona || "");
+  const [action, setAction] = useState(game.liveQuestion.action || "");
+  const [personaPool, setPersonaPool] = useState<string[]>(game.liveQuestion.personaPool || []);
+  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || []);
 
   useEffect(() => {
     const storedPlayer = sessionStorage.getItem("player");
@@ -65,28 +70,73 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     setLoading(true);
     // For starting the game, pass the selected persona and action
     if (nextState === 'asking' && game.status === 'lobby') {
-        if (!persona || !action) {
+        if (!persona || !action || personaPool.length < 2 || actionPool.length < 2) {
             toast({
                 variant: 'destructive',
                 title: 'Setup Incomplete',
-                description: 'Please select a persona and an action for the first round.'
+                description: 'Please select pools (min 2 each) and a correct persona/action for the first round.'
             })
             setLoading(false);
             return;
         }
-        await advanceGameState(game.id, nextState, { persona, action });
+        await advanceGameState(game.id, nextState, { persona, action, personaPool, actionPool });
     } else {
         await advanceGameState(game.id, nextState);
     }
     setLoading(false);
   };
+  
+  // Debounced update for round data
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (game.status === 'lobby' || game.status === 'scoring') {
+        setRoundData(game.id, { persona, action, personaPool, actionPool });
+      }
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [persona, action, personaPool, actionPool, game.id, game.status]);
+
+
+  // Clear persona/action if they are no longer in the pool
+  useEffect(() => {
+    if (persona && !personaPool.includes(persona)) {
+      setPersona('');
+    }
+  }, [personaPool, persona]);
+
+  useEffect(() => {
+    if (action && !actionPool.includes(action)) {
+      setAction('');
+    }
+  }, [actionPool, action]);
+
 
   const handleScoreRound = async () => {
     setLoading(true);
     await scoreRound(game.id);
+    // Reset for next round setup
+    setPersona('');
+    setAction('');
+    setPersonaPool([]);
+    setActionPool([]);
     setLoading(false);
   };
   
+  const handleNextRound = async () => {
+    setLoading(true);
+    if (!persona || !action || personaPool.length < 2 || actionPool.length < 2) {
+        toast({
+            variant: 'destructive',
+            title: 'Setup Incomplete',
+            description: 'Please select pools (min 2 each) and a correct persona/action for the next round.'
+        })
+        setLoading(false);
+        return;
+    }
+    await advanceGameState(game.id, 'asking', { persona, action, personaPool, actionPool });
+    setLoading(false);
+  }
+
   const handleSubmitQuestion = async () => {
     if (!game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action) {
       toast({
@@ -139,6 +189,39 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         </div>
     )
   }
+  
+  const renderRoundSetup = (title: string) => (
+      <div className="space-y-4 rounded-lg border p-4">
+        <h3 className="flex items-center gap-2 font-headline text-lg font-semibold"><Settings /> {title}</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+                <Label>Persona Pool</Label>
+                <MultiSelect options={PERSONAS} selected={personaPool} onChange={setPersonaPool} placeholder="Select personas for the pool..." />
+            </div>
+             <div className="space-y-2">
+                <Label>Correct Persona</Label>
+                <Select value={persona} onValueChange={setPersona} disabled={personaPool.length === 0}>
+                    <SelectTrigger><SelectValue placeholder="Select correct persona..." /></SelectTrigger>
+                    <SelectContent>{personaPool.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                </Select>
+            </div>
+        </div>
+         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+                <Label>Action Pool</Label>
+                <MultiSelect options={ACTIONS} selected={actionPool} onChange={setActionPool} placeholder="Select actions for the pool..." />
+            </div>
+             <div className="space-y-2">
+                <Label>Correct Action</Label>
+                <Select value={action} onValueChange={setAction} disabled={actionPool.length === 0}>
+                    <SelectTrigger><SelectValue placeholder="Select correct action..." /></SelectTrigger>
+                    <SelectContent>{actionPool.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                </Select>
+            </div>
+        </div>
+      </div>
+  );
+
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8">
@@ -178,26 +261,16 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                 {game.status !== 'lobby' && ` | Round: ${game.currentRound}`}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               {game.status === "lobby" && (
-                <div className="space-y-4 rounded-lg border p-4">
-                  <h3 className="font-semibold">Setup First Round</h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Select value={persona} onValueChange={setPersona}>
-                        <SelectTrigger><SelectValue placeholder="Select Persona" /></SelectTrigger>
-                        <SelectContent>{PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Select value={action} onValueChange={setAction}>
-                        <SelectTrigger><SelectValue placeholder="Select Action" /></SelectTrigger>
-                        <SelectContent>{ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={() => handleAdvanceState("asking")} disabled={loading || players.length < 1 || !persona || !action}>
+                <>
+                  {renderRoundSetup("Setup First Round")}
+                  <Button onClick={() => handleAdvanceState("asking")} disabled={loading || players.length < 1 || !persona || !action || personaPool.length < 2 || actionPool.length < 2}>
                     {loading ? <Loader2 className="animate-spin" /> : <Play />}
                     <span>Start Game</span>
                   </Button>
                   {players.length < 1 && <p className="text-sm text-muted-foreground">Waiting for at least 1 contestant to join.</p>}
-                </div>
+                </>
               )}
               {game.status === "asking" && (
                  <div className="space-y-4 rounded-lg border p-4">
@@ -230,10 +303,13 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                </Button>
               )}
               {game.status === "scoring" && (
-                 <Button onClick={() => handleAdvanceState("asking")} disabled={loading}>
-                   {loading ? <Loader2 className="animate-spin" /> : <ChevronRight />}
-                   <span>Start Next Round</span>
-                 </Button>
+                 <div>
+                    {renderRoundSetup(`Setup Round ${game.currentRound + 1}`)}
+                    <Button onClick={handleNextRound} className="mt-4" disabled={loading}>
+                      {loading ? <Loader2 className="animate-spin" /> : <ChevronRight />}
+                      <span>Start Next Round</span>
+                    </Button>
+                 </div>
               )}
             </CardContent>
           </Card>

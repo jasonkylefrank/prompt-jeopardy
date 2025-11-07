@@ -1,8 +1,8 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { submitAnswer } from "@/app/actions";
-import { ACTIONS, PERSONAS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,11 +19,13 @@ import { Progress } from "../ui/progress";
 type AnswerSelectorProps = {
   gameId: string;
   playerId: string;
+  personaPool: string[];
+  actionPool: string[];
 };
 
 const ANSWER_TIME = 30; // seconds
 
-export function AnswerSelector({ gameId, playerId }: AnswerSelectorProps) {
+export function AnswerSelector({ gameId, playerId, personaPool, actionPool }: AnswerSelectorProps) {
   const [persona, setPersona] = useState("");
   const [action, setAction] = useState("");
   const [loading, setLoading] = useState(false);
@@ -81,7 +83,7 @@ export function AnswerSelector({ gameId, playerId }: AnswerSelectorProps) {
               <SelectValue placeholder="Select a persona..." />
             </SelectTrigger>
             <SelectContent>
-              {PERSONAS.map((p) => (
+              {personaPool.map((p) => (
                 <SelectItem key={p} value={p}>
                   {p}
                 </SelectItem>
@@ -96,7 +98,7 @@ export function AnswerSelector({ gameId, playerId }: AnswerSelectorProps) {
               <SelectValue placeholder="Select an action..." />
             </SelectTrigger>
             <SelectContent>
-              {ACTIONS.map((a) => (
+              {actionPool.map((a) => (
                 <SelectItem key={a} value={a}>
                   {a}
                 </SelectItem>

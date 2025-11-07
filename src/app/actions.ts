@@ -27,11 +27,14 @@ export async function createGame(hostData: Omit<Player, 'score' | 'isHost'>): Pr
     rounds: [],
     currentRound: 0,
     currentAskerId: null,
-    liveQuestion: { text: '' }, // Persona and action are set when starting the game
+    liveQuestion: { 
+      text: '',
+      persona: '',
+      action: '',
+      personaPool: [],
+      actionPool: [],
+    },
   };
-
-  // The host is not a player in the game list
-  // newGame.players[host.id] = host;
 
   await saveGame(newGame);
   return gameId;
@@ -84,7 +87,7 @@ export async function getAllGames(): Promise<Game[]> {
 export async function advanceGameState(
   gameId: string,
   newStatus: Game['status'],
-  options?: { persona?: string, action?: string }
+  options?: { persona?: string, action?: string, personaPool?: string[], actionPool?: string[] }
 ) {
   const game = await getGameState(gameId);
   if (!game) return;
@@ -94,9 +97,11 @@ export async function advanceGameState(
   // Logic for advancing from lobby to asking
   if (newStatus === 'asking' && game.currentRound === 0) {
     game.currentRound = 1;
-    if(options?.persona && options?.action) {
+    if(options?.persona && options?.action && options?.personaPool && options?.actionPool) {
         game.liveQuestion.persona = options.persona;
         game.liveQuestion.action = options.action;
+        game.liveQuestion.personaPool = options.personaPool;
+        game.liveQuestion.actionPool = options.actionPool;
     }
 
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
@@ -107,9 +112,11 @@ export async function advanceGameState(
   // Logic for advancing to a new round (from scoring to asking)
   else if (newStatus === 'asking' && game.status !== 'lobby') {
     game.currentRound += 1;
-     if(options?.persona && options?.action) {
+     if(options?.persona && options?.action && options?.personaPool && options?.actionPool) {
         game.liveQuestion.persona = options.persona;
         game.liveQuestion.action = options.action;
+        game.liveQuestion.personaPool = options.personaPool;
+        game.liveQuestion.actionPool = options.actionPool;
     }
     
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
@@ -148,21 +155,24 @@ export async function updateLiveQuestion(gameId: string, questionText: string) {
     revalidatePath(`/game/${gameId}/host`);
 }
 
-export async function setRoundPersonaAndAction(gameId: string, persona: string, action: string) {
+export async function setRoundData(gameId: string, data: { persona?: string, action?: string, personaPool?: string[], actionPool?: string[]}) {
     const gameDocRef = doc(firestore, 'games', gameId);
-    await updateDoc(gameDocRef, {
-        'liveQuestion.persona': persona,
-        'liveQuestion.action': action,
-    });
-    revalidatePath(`/game/${gameId}`);
+    const updateData: Record<string, any> = {};
+    if (data.persona !== undefined) updateData['liveQuestion.persona'] = data.persona;
+    if (data.action !== undefined) updateData['liveQuestion.action'] = data.action;
+    if (data.personaPool !== undefined) updateData['liveQuestion.personaPool'] = data.personaPool;
+    if (data.actionPool !== undefined) updateData['liveQuestion.actionPool'] = data.actionPool;
+
+    await updateDoc(gameDocRef, updateData);
     revalidatePath(`/game/${gameId}/host`);
 }
+
 
 // --- ROUND ACTIONS ---
 
 export async function submitQuestion(gameId: string) {
   const game = await getGameState(gameId);
-  if (!game || !game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action || !game.currentAskerId) return;
+  if (!game || !game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action || !game.currentAskerId || !game.liveQuestion.personaPool || !game.liveQuestion.actionPool) return;
 
   game.status = 'responding';
   const newRound = {
@@ -176,6 +186,8 @@ export async function submitQuestion(gameId: string) {
       persona: game.liveQuestion.persona,
       action: game.liveQuestion.action,
     },
+    personaPool: game.liveQuestion.personaPool,
+    actionPool: game.liveQuestion.actionPool,
   };
 
   // If it's a new round, push it. Otherwise, update the existing one if needed.
@@ -269,6 +281,6 @@ export async function scoreRound(gameId: string) {
   game.status = 'scoring';
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gamegaId}/host`);
+  revalidatePath(`/game/${gameId}/host`);
   revalidatePath(`/history/${gameId}`);
 }

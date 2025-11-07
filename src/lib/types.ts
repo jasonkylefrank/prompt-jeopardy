@@ -22,6 +22,8 @@ export interface Round {
     persona: string;
     action: string;
   };
+  personaPool: string[];
+  actionPool: string[];
 }
 
 export type GameStatus =
@@ -45,6 +47,8 @@ export interface Game {
     text: string;
     persona?: string;
     action?: string;
+    personaPool?: string[];
+    actionPool?: string[];
   };
 }
 
