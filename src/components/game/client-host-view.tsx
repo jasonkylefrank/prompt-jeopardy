@@ -56,8 +56,10 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
 
   const [persona, setPersona] = useState(game.liveQuestion.persona || "");
   const [action, setAction] = useState(game.liveQuestion.action || "");
+  
+  const allActions = ACTIONS;
   const [personaPool, setPersonaPool] = useState<string[]>(game.liveQuestion.personaPool || []);
-  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || ACTIONS);
+  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || allActions);
 
   useEffect(() => {
     const storedPlayer = sessionStorage.getItem("player");
@@ -118,7 +120,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     setPersona('');
     setAction('');
     setPersonaPool([]);
-    setActionPool(ACTIONS); // Pre-select all actions for the next round
+    setActionPool(allActions); // Pre-select all actions for the next round
     setLoading(false);
   };
   
@@ -192,7 +194,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             <div className="space-y-2">
                 <Label>Action Pool (select up to 5)</Label>
                 <MultiSelect 
-                    options={ACTIONS} 
+                    options={allActions} 
                     selected={actionPool} 
                     onChange={setActionPool} 
                     placeholder="Select actions for the pool..."
@@ -335,7 +337,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                   <CardDescription>
                     See who has submitted their answers for Round {currentRound.roundNumber}.
                   </CardDescription>
-                </Header>
+                </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {players.map(player => (
@@ -389,3 +391,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    

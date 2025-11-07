@@ -82,7 +82,11 @@ export function MultiSelect({
           <div className="flex flex-wrap items-center gap-1">
             {selected.length > 0 ? (
               selected.map((item) => (
-                <Badge key={item} variant="secondary" className="mr-1 mb-1 whitespace-normal">
+                <Badge
+                  key={item}
+                  variant="secondary"
+                  className="mb-1 mr-1 whitespace-nowrap"
+                >
                   {item}
                 </Badge>
               ))
@@ -150,3 +154,5 @@ export function MultiSelect({
     </Popover>
   );
 }
+
+    
