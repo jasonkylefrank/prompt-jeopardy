@@ -233,7 +233,8 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             </div>
         </div>
       </div>
-  )};
+    );
+  };
 
 
   return (
@@ -389,5 +390,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    
