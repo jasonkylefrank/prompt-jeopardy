@@ -4,11 +4,12 @@
 import { revalidatePath } from 'next/cache';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-import { firestore } from '@/firebase/admin';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { firestore } from '@/firebase/server';
 
 async function saveGame(game: Game): Promise<void> {
-  const gameDocRef = firestore.collection('games').doc(game.id);
-  await gameDocRef.set(game, { merge: true });
+  const gameDocRef = doc(firestore, 'games', game.id);
+  await setDoc(gameDocRef, game, { merge: true });
 }
 
 // --- GAME CREATION AND JOINING ---
@@ -59,8 +60,8 @@ export async function joinGame(
 // --- GAME STATE MANAGEMENT ---
 
 export async function getGameState(gameId: string): Promise<Game | null> {
-  const gameDocRef = firestore.collection('games').doc(gameId);
-  const gameDoc = await gameDocRef.get();
+  const gameDocRef = doc(firestore, 'games', gameId);
+  const gameDoc = await getDoc(gameDocRef);
   if (!gameDoc.exists) {
     return null;
   }
@@ -68,8 +69,8 @@ export async function getGameState(gameId: string): Promise<Game | null> {
 }
 
 export async function getAllGames(): Promise<Game[]> {
-    const gamesCollectionRef = firestore.collection('games');
-    const gamesSnapshot = await gamesCollectionRef.get();
+    const gamesCollectionRef = collection(firestore, 'games');
+    const gamesSnapshot = await getDocs(gamesCollectionRef);
     const games: Game[] = [];
     gamesSnapshot.forEach(doc => {
       games.push(doc.data() as Game);
