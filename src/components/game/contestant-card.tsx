@@ -1,7 +1,8 @@
+
 "use client";
 
 import type { Player } from "@/lib/types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Crown } from "lucide-react";
 
 type ContestantCardProps = {
@@ -18,7 +19,6 @@ export function ContestantCard({ player, horizontal = false }: ContestantCardPro
     >
       <div className="relative">
         <Avatar className="h-16 w-16 border-2 border-primary">
-          <AvatarImage src={player.avatarUrl} alt={player.name} />
           <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
         </Avatar>
         {player.isHost && (

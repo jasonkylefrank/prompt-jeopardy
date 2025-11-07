@@ -1,7 +1,8 @@
+
 "use client";
 
 import type { Player } from "@/lib/types";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Crown } from "lucide-react";
 
 type LeaderboardProps = {
@@ -20,7 +21,6 @@ export function Leaderboard({ players, horizontal, compact }: LeaderboardProps) 
                 <div key={player.id} className="flex items-center gap-2">
                     <span className={`font-bold ${compact ? 'text-sm' : 'text-lg'}`}>{index + 1}.</span>
                      <Avatar className={`${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-                        <AvatarImage src={player.avatarUrl} alt={player.name} />
                         <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -45,7 +45,6 @@ export function Leaderboard({ players, horizontal, compact }: LeaderboardProps) 
             {index + 1}
           </span>
           <Avatar>
-            <AvatarImage src={player.avatarUrl} alt={player.name} />
             <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="flex-grow">

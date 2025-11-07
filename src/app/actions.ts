@@ -2,20 +2,16 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getGame, saveGame } from '@/lib/db';
+import { getGame, saveGame, getGames } from '@/lib/db';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-// Import from server-side firebase setup
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { firestore } from '@/firebase/server';
-import { doc, getDoc } from 'firebase/firestore';
+
 
 // --- GAME CREATION AND JOINING ---
 
-export async function createGame(host: {
-  id: string;
-  name: string;
-  avatarUrl: string;
-}): Promise<string> {
+export async function createGame(host: Omit<Player, 'score'>): Promise<string> {
   const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
   const hostPlayer: Player = { ...host, score: 0, isHost: true };
 
@@ -37,15 +33,17 @@ export async function createGame(host: {
 
 export async function joinGame(
   gameId: string,
-  playerData: { id: string; name: string; avatarUrl: string }
+  playerData: Omit<Player, 'score'>
 ): Promise<{ success: boolean; message: string }> {
   const game = await getGame(gameId);
   if (!game) {
     return { success: false, message: 'Game not found.' };
   }
 
-  // Check if player is already in the game from a previous session
+  // To prevent re-joining with a different name, we'll need a way to identify a user within a session.
+  // For now, we'll allow re-joining, but in a real app, this would need more robust handling.
   const playerDoc = await getDoc(doc(firestore, 'games', gameId, 'players', playerData.id));
+
 
   if (!playerDoc.exists() && game.status !== 'lobby') {
     return { success: false, message: 'Game has already started.' };
@@ -65,6 +63,10 @@ export async function joinGame(
 
 export async function getGameState(gameId: string): Promise<Game | null> {
   return await getGame(gameId);
+}
+
+export async function getAllGames(): Promise<Game[]> {
+    return await getGames();
 }
 
 export async function advanceGameState(
@@ -100,6 +102,8 @@ export async function advanceGameState(
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/history/${gameId}`);
+  revalidatePath(`/history`);
 }
 
 // --- ROUND ACTIONS ---
@@ -130,6 +134,7 @@ export async function submitQuestion(
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/history/${gameId}`);
 
   // Start LLM response generation asynchronously
   generateAndSaveLLMResponse(gameId, question, persona, action);
@@ -157,6 +162,7 @@ async function generateAndSaveLLMResponse(
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/admin`);
+    revalidatePath(`/history/${gameId}`);
   }
 }
 
@@ -174,6 +180,7 @@ export async function submitAnswer(
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/admin`);
+    revalidatePath(`/history/${gameId}`);
   }
 }
 
@@ -208,4 +215,5 @@ export async function scoreRound(gameId: string) {
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/history/${gameId}`);
 }

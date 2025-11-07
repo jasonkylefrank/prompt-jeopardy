@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ACTIONS, PERSONAS } from "@/lib/constants";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Leaderboard } from "./leaderboard";
 import { ContestantCard } from "./contestant-card";
 import { Input } from "../ui/input";
@@ -43,17 +44,24 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
+import type { User } from "@/lib/types";
 
 export function ClientAdminView({ initialGame }: { initialGame: Game }) {
   const { game } = useGameState(initialGame);
-  const { user } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [question, setQuestion] = useState("");
   const [persona, setPersona] = useState("");
   const [action, setAction] = useState("");
+
+  useEffect(() => {
+    const storedPlayer = sessionStorage.getItem("player");
+    if (storedPlayer) {
+      setUser(JSON.parse(storedPlayer));
+    }
+  }, []);
 
   const handleAdvanceState = async (nextState: Game["status"]) => {
     setLoading(true);
@@ -99,6 +107,10 @@ export function ClientAdminView({ initialGame }: { initialGame: Game }) {
   
   const isHost = user?.id === game.hostId;
 
+  if (!user) {
+    return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
+  }
+
   if (!isHost) {
     return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
@@ -140,7 +152,7 @@ export function ClientAdminView({ initialGame }: { initialGame: Game }) {
                 </Link>
            </Button>
            <Label htmlFor="game-link" className="sr-only">Game Link</Label>
-           <Input id="game-link" value={`${window.location.origin}/game/${game.id}`} readOnly className="w-64"/>
+           <Input id="game-link" value={`${typeof window !== 'undefined' ? window.location.origin: ''}/game/${game.id}`} readOnly className="w-64"/>
           <Button variant="outline" size="icon" onClick={copyGameLink}>
             <Copy className="h-4 w-4" />
           </Button>

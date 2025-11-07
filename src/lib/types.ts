@@ -1,7 +1,7 @@
+
 export interface Player {
   id: string;
   name: string;
-  avatarUrl: string;
   score: number;
   isHost?: boolean;
 }
@@ -42,9 +42,8 @@ export interface Game {
   currentAskerId: string;
 }
 
-// For mock auth
+// Simplified user for client-side session
 export interface User {
   id: string;
   name: string;
-  avatarUrl: string;
 }
