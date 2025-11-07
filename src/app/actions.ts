@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
 import { collection, getDocs, doc, getDoc, setDoc, FirestoreError } from "firebase/firestore";
-import { firestore } from '@/firebase/server';
+import { firestore } from '@/firebase/admin';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
