@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -49,26 +48,5 @@ export async function saveGame(game: Game): Promise<void> {
       errorEmitter.emit('permission-error', contextualError);
     }
      // We don't re-throw here to avoid crashing the server action
-  }
-}
-
-export async function getGames(): Promise<Game[]> {
-  const gamesCollectionRef = collection(firestore, 'games');
-  try {
-    const gamesSnapshot = await getDocs(gamesCollectionRef);
-    const games: Game[] = [];
-    gamesSnapshot.forEach(doc => {
-      games.push(doc.data() as Game);
-    });
-    return games;
-  } catch (error) {
-    if (error instanceof FirestoreError && error.code === 'permission-denied') {
-        const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path: gamesCollectionRef.path,
-        });
-        errorEmitter.emit('permission-error', contextualError);
-    }
-    return []; // Return empty array on error
   }
 }

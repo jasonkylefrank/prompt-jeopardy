@@ -2,11 +2,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getGame, saveGame, getGames } from '@/lib/db';
+import { getGame, saveGame } from '@/lib/db';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, FirestoreError } from "firebase/firestore";
 import { firestore } from '@/firebase/server';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 
 // --- GAME CREATION AND JOINING ---
@@ -66,7 +68,24 @@ export async function getGameState(gameId: string): Promise<Game | null> {
 }
 
 export async function getAllGames(): Promise<Game[]> {
-    return await getGames();
+    const gamesCollectionRef = collection(firestore, 'games');
+    try {
+      const gamesSnapshot = await getDocs(gamesCollectionRef);
+      const games: Game[] = [];
+      gamesSnapshot.forEach(doc => {
+        games.push(doc.data() as Game);
+      });
+      return games;
+    } catch (error) {
+      if (error instanceof FirestoreError && error.code === 'permission-denied') {
+          const contextualError = new FirestorePermissionError({
+              operation: 'list',
+              path: gamesCollectionRef.path,
+          });
+          errorEmitter.emit('permission-error', contextualError);
+      }
+      return []; // Return empty array on error
+    }
 }
 
 export async function advanceGameState(
