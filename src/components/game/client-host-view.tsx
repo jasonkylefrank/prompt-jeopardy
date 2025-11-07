@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ACTIONS, PERSONAS } from "@/lib/constants";
+import { PERSONAS, ACTIONS } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { Leaderboard } from "./leaderboard";
 import { ContestantCard } from "./contestant-card";
@@ -57,9 +57,9 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const [persona, setPersona] = useState(game.liveQuestion.persona || "");
   const [action, setAction] = useState(game.liveQuestion.action || "");
   
-  const allActions = ACTIONS;
+  const allPersonas = PERSONAS.flatMap(p => p.options);
   const [personaPool, setPersonaPool] = useState<string[]>(game.liveQuestion.personaPool || []);
-  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || allActions);
+  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || ACTIONS);
 
   useEffect(() => {
     const storedPlayer = sessionStorage.getItem("player");
@@ -120,7 +120,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     setPersona('');
     setAction('');
     setPersonaPool([]);
-    setActionPool(allActions); // Pre-select all actions for the next round
+    setActionPool(ACTIONS); // Pre-select all actions for the next round
     setLoading(false);
   };
   
@@ -194,7 +194,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             <div className="space-y-2">
                 <Label>Action Pool (select up to 5)</Label>
                 <MultiSelect 
-                    options={allActions} 
+                    options={ACTIONS} 
                     selected={actionPool} 
                     onChange={setActionPool} 
                     placeholder="Select actions for the pool..."
@@ -391,5 +391,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    
