@@ -190,7 +190,8 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     )
   }
   
-  const renderRoundSetup = (title: string) => (
+  const renderRoundSetup = (title: string) => {
+    return (
       <div className="space-y-4 rounded-lg border p-4">
         <h3 className="flex items-center gap-2 font-headline text-lg font-semibold"><Settings /> {title}</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -232,7 +233,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             </div>
         </div>
       </div>
-  );
+  )};
 
 
   return (
@@ -388,3 +389,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    
