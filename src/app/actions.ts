@@ -4,14 +4,11 @@
 import { revalidatePath } from 'next/cache';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-import { collection, getDocs, doc, getDoc, setDoc, FirestoreError } from "firebase/firestore";
-import { firestore } from '@/firebase/server';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { firestore } from '@/firebase/admin';
 
-export async function saveGame(game: Game): Promise<void> {
-  const gameDocRef = doc(firestore, 'games', game.id);
-  await setDoc(gameDocRef, game, { merge: true });
+async function saveGame(game: Game): Promise<void> {
+  const gameDocRef = firestore.collection('games').doc(game.id);
+  await gameDocRef.set(game, { merge: true });
 }
 
 // --- GAME CREATION AND JOINING ---
@@ -62,44 +59,22 @@ export async function joinGame(
 // --- GAME STATE MANAGEMENT ---
 
 export async function getGameState(gameId: string): Promise<Game | null> {
-  const gameDocRef = doc(firestore, 'games', gameId);
-  try {
-    const gameDoc = await getDoc(gameDocRef);
-    if (!gameDoc.exists()) {
-      return null;
-    }
-    return gameDoc.data() as Game;
-  } catch (error) {
-    if (error instanceof FirestoreError && error.code === 'permission-denied') {
-      const contextualError = new FirestorePermissionError({
-        operation: 'get',
-        path: gameDocRef.path,
-      });
-      errorEmitter.emit('permission-error', contextualError);
-    }
+  const gameDocRef = firestore.collection('games').doc(gameId);
+  const gameDoc = await gameDocRef.get();
+  if (!gameDoc.exists) {
     return null;
   }
+  return gameDoc.data() as Game;
 }
 
 export async function getAllGames(): Promise<Game[]> {
-    const gamesCollectionRef = collection(firestore, 'games');
-    try {
-      const gamesSnapshot = await getDocs(gamesCollectionRef);
-      const games: Game[] = [];
-      gamesSnapshot.forEach(doc => {
-        games.push(doc.data() as Game);
-      });
-      return games;
-    } catch (error) {
-      if (error instanceof FirestoreError && error.code === 'permission-denied') {
-          const contextualError = new FirestorePermissionError({
-              operation: 'list',
-              path: gamesCollectionRef.path,
-          });
-          errorEmitter.emit('permission-error', contextualError);
-      }
-      return []; 
-    }
+    const gamesCollectionRef = firestore.collection('games');
+    const gamesSnapshot = await gamesCollectionRef.get();
+    const games: Game[] = [];
+    gamesSnapshot.forEach(doc => {
+      games.push(doc.data() as Game);
+    });
+    return games;
 }
 
 export async function advanceGameState(
