@@ -62,6 +62,7 @@ export default function Home() {
         const newGameId = await createGame(player);
         // Store user info for the session
         sessionStorage.setItem("player", JSON.stringify(player));
+        router.refresh();
         router.push(`/game/${newGameId}/admin`);
       } catch (err) {
         setCreateError("Failed to create game. Please try again.");
@@ -80,6 +81,8 @@ export default function Home() {
         } else {
           // Store user info for the session
           sessionStorage.setItem("player", JSON.stringify(player));
+          // Refresh the page to ensure sessionStorage is updated before navigation
+          router.refresh();
           router.push(`/game/${gameId.toUpperCase()}`);
         }
       } catch (err) {
