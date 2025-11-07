@@ -27,8 +27,11 @@ export async function createGame(hostData: Omit<Player, 'score' | 'isHost'>): Pr
     rounds: [],
     currentRound: 0,
     currentAskerId: null,
-    liveQuestion: { text: '', persona: '', action: '' },
+    liveQuestion: { text: '' }, // Persona and action are set when starting the game
   };
+
+  // The host is not a player in the game list
+  // newGame.players[host.id] = host;
 
   await saveGame(newGame);
   return gameId;
@@ -80,18 +83,33 @@ export async function getAllGames(): Promise<Game[]> {
 
 export async function advanceGameState(
   gameId: string,
-  newStatus: Game['status']
+  newStatus: Game['status'],
+  options?: { persona?: string, action?: string }
 ) {
   const game = await getGameState(gameId);
   if (!game) return;
 
   game.status = newStatus;
 
-  // Logic for advancing to the 'asking' state
-  if (newStatus === 'asking') {
-    // If it's the start of the game or the end of a round
-    if (game.currentRound === 0 || game.status !== 'scoring') {
-       game.currentRound += 1;
+  // Logic for advancing from lobby to asking
+  if (newStatus === 'asking' && game.currentRound === 0) {
+    game.currentRound = 1;
+    if(options?.persona && options?.action) {
+        game.liveQuestion.persona = options.persona;
+        game.liveQuestion.action = options.action;
+    }
+
+    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
+    if (playerIds.length > 0) {
+      game.currentAskerId = playerIds[0];
+    }
+  } 
+  // Logic for advancing to a new round (from scoring to asking)
+  else if (newStatus === 'asking' && game.status !== 'lobby') {
+    game.currentRound += 1;
+     if(options?.persona && options?.action) {
+        game.liveQuestion.persona = options.persona;
+        game.liveQuestion.action = options.action;
     }
     
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
@@ -105,9 +123,10 @@ export async function advanceGameState(
       // No non-host players, maybe reset or handle this case
       game.currentAskerId = null;
     }
-    // Reset live question for the new round
-    game.liveQuestion = { text: '', persona: '', action: '' };
+    // Reset live question text for the new round
+    game.liveQuestion.text = '';
   }
+
 
   if (newStatus === 'finished') {
     // any cleanup for game end
@@ -250,6 +269,6 @@ export async function scoreRound(gameId: string) {
   game.status = 'scoring';
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/host`);
+  revalidatePath(`/game/${gamegaId}/host`);
   revalidatePath(`/history/${gameId}`);
 }

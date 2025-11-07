@@ -43,8 +43,8 @@ export interface Game {
   currentAskerId: string | null;
   liveQuestion: {
     text: string;
-    persona: string;
-    action: string;
+    persona?: string;
+    action?: string;
   };
 }
 

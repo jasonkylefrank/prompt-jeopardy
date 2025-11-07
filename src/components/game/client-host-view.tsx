@@ -4,7 +4,6 @@
 import {
   advanceGameState,
   scoreRound,
-  setRoundPersonaAndAction,
   submitQuestion,
 } from "@/app/actions";
 import type { Game } from "@/lib/types";
@@ -62,16 +61,23 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     }
   }, []);
 
-  useEffect(() => {
-    // When persona or action changes, update the server
-    if (persona && action) {
-        setRoundPersonaAndAction(game.id, persona, action);
-    }
-  }, [persona, action, game.id])
-
   const handleAdvanceState = async (nextState: Game["status"]) => {
     setLoading(true);
-    await advanceGameState(game.id, nextState);
+    // For starting the game, pass the selected persona and action
+    if (nextState === 'asking' && game.status === 'lobby') {
+        if (!persona || !action) {
+            toast({
+                variant: 'destructive',
+                title: 'Setup Incomplete',
+                description: 'Please select a persona and an action for the first round.'
+            })
+            setLoading(false);
+            return;
+        }
+        await advanceGameState(game.id, nextState, { persona, action });
+    } else {
+        await advanceGameState(game.id, nextState);
+    }
     setLoading(false);
   };
 
@@ -82,7 +88,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   };
   
   const handleSubmitQuestion = async () => {
-    if (!game.liveQuestion.text || !persona || !action) {
+    if (!game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action) {
       toast({
         variant: "destructive",
         title: "Missing Information",
@@ -174,10 +180,24 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             </CardHeader>
             <CardContent>
               {game.status === "lobby" && (
-                <Button onClick={() => handleAdvanceState("asking")} disabled={loading || players.length < 1}>
-                  {loading ? <Loader2 className="animate-spin" /> : <Play />}
-                  <span>Start Game</span>
-                </Button>
+                <div className="space-y-4 rounded-lg border p-4">
+                  <h3 className="font-semibold">Setup First Round</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Select value={persona} onValueChange={setPersona}>
+                        <SelectTrigger><SelectValue placeholder="Select Persona" /></SelectTrigger>
+                        <SelectContent>{PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={action} onValueChange={setAction}>
+                        <SelectTrigger><SelectValue placeholder="Select Action" /></SelectTrigger>
+                        <SelectContent>{ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={() => handleAdvanceState("asking")} disabled={loading || players.length < 1 || !persona || !action}>
+                    {loading ? <Loader2 className="animate-spin" /> : <Play />}
+                    <span>Start Game</span>
+                  </Button>
+                  {players.length < 1 && <p className="text-sm text-muted-foreground">Waiting for at least 1 contestant to join.</p>}
+                </div>
               )}
               {game.status === "asking" && (
                  <div className="space-y-4 rounded-lg border p-4">
@@ -187,18 +207,11 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                      <p className="text-muted-foreground">Live question:</p>
                     <p className="text-lg font-semibold italic">"{game.liveQuestion.text || '...'}"</p>
                     
-                    <h3 className="font-semibold">Set Persona and Action for this Round</h3>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Select value={persona} onValueChange={setPersona}>
-                          <SelectTrigger><SelectValue placeholder="Select Persona" /></SelectTrigger>
-                          <SelectContent>{PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <Select value={action} onValueChange={setAction}>
-                          <SelectTrigger><SelectValue placeholder="Select Action" /></SelectTrigger>
-                          <SelectContent>{ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleSubmitQuestion} disabled={loading || !game.liveQuestion.text || !persona || !action}>
+                    <p className="text-sm text-muted-foreground">
+                        Round Persona: <span className="font-semibold">{game.liveQuestion.persona}</span> | Action: <span className="font-semibold">{game.liveQuestion.action}</span>
+                    </p>
+
+                    <Button onClick={handleSubmitQuestion} disabled={loading || !game.liveQuestion.text}>
                       {loading ? <Loader2 className="animate-spin" /> : <Send />}
                       <span>Lock In Question & Start Answering</span>
                     </Button>
