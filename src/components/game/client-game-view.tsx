@@ -19,6 +19,7 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRejoinDialogOpen, setIsRejoinDialogOpen] = useState(false);
+  const [rejoinLoading, setRejoinLoading] = useState(false);
   const { game } = useGameState(initialGame);
 
   useEffect(() => {
@@ -41,14 +42,19 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
   }, [game.players, game.hostId]);
 
   const handleRejoin = async (name: string) => {
-     const player: Omit<Player, "score"> = {
-      id: Math.random().toString(36).substring(2, 9),
-      name,
-    };
-    await joinGame(game.id, player);
-    sessionStorage.setItem("player", JSON.stringify(player));
-    setUser(player);
-    setIsRejoinDialogOpen(false);
+    setRejoinLoading(true);
+    try {
+        const player: Omit<Player, "score"> = {
+            id: Math.random().toString(36).substring(2, 9),
+            name,
+        };
+        await joinGame(game.id, player);
+        sessionStorage.setItem("player", JSON.stringify(player));
+        setUser(player);
+        setIsRejoinDialogOpen(false);
+    } finally {
+        setRejoinLoading(false);
+    }
   };
 
 
@@ -72,7 +78,7 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
           // Prevent closing the dialog by clicking outside
           onOpenChange={(open) => !open && handleRejoin ? null : setIsRejoinDialogOpen(open)}
           onNameSubmit={handleRejoin}
-          loading={false}
+          loading={rejoinLoading}
         />
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
           <AppLogo className="h-20 w-20 text-primary" />
