@@ -151,7 +151,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     setLoading(false);
   };
 
-  const players = Object.values(game.players);
+  const players = Object.values(game.players).filter(p => !p.isHost);
   const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
 
   const copyGameLink = () => {
@@ -376,3 +376,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    
