@@ -5,15 +5,12 @@ import { revalidatePath } from 'next/cache';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
 import { collection, getDocs, doc, getDoc, setDoc, FirestoreError } from "firebase/firestore";
-import { firestore } from '@/firebase/admin';
+import { firestore } from '@/firebase/server';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-// This function was moved from `lib/db.ts` to `actions.ts` to resolve a server/client module conflict.
 export async function saveGame(game: Game): Promise<void> {
   const gameDocRef = doc(firestore, 'games', game.id);
-  // No try-catch block here. Let errors propagate up to the caller in server actions.
-  // The non-blocking error handling is for client-side operations.
   await setDoc(gameDocRef, game, { merge: true });
 }
 
@@ -41,19 +38,14 @@ export async function createGame(host: Omit<Player, 'score'>): Promise<string> {
 
 export async function joinGame(
   gameId: string,
-  playerData: Omit<Player, 'score'>
+  playerData: Omit<Player, "score">
 ): Promise<{ success: boolean; message: string }> {
   const game = await getGameState(gameId);
   if (!game) {
     return { success: false, message: 'Game not found.' };
   }
-
-  // To prevent re-joining with a different name, we'll need a way to identify a user within a session.
-  // For now, we'll allow re-joining, but in a real app, this would need more robust handling.
-  const playerDoc = await getDoc(doc(firestore, 'games', gameId, 'players', playerData.id));
-
-
-  if (!playerDoc.exists() && game.status !== 'lobby') {
+  
+  if (game.status !== 'lobby') {
     return { success: false, message: 'Game has already started.' };
   }
   
@@ -85,7 +77,6 @@ export async function getGameState(gameId: string): Promise<Game | null> {
       });
       errorEmitter.emit('permission-error', contextualError);
     }
-    // Return null or re-throw a generic error if it's not a permission issue
     return null;
   }
 }
@@ -107,7 +98,7 @@ export async function getAllGames(): Promise<Game[]> {
           });
           errorEmitter.emit('permission-error', contextualError);
       }
-      return []; // Return empty array on error
+      return []; 
     }
 }
 
@@ -120,9 +111,7 @@ export async function advanceGameState(
 
   game.status = newStatus;
 
-  // Logic for advancing rounds
   if (newStatus === 'asking') {
-    // Filter out the host before determining the next asker
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
     
     if (playerIds.length > 0) {
@@ -130,12 +119,10 @@ export async function advanceGameState(
       const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
       game.currentAskerId = playerIds[nextAskerIndex];
 
-      // Increment round only when it cycles back to the first player
       if (nextAskerIndex === 0) {
         game.currentRound += 1;
       }
     } else {
-      // If only the host is present, they become the asker.
       game.currentAskerId = game.hostId;
     }
   }
@@ -163,7 +150,7 @@ export async function submitQuestion(
 
   game.status = 'responding';
   const newRound = {
-    roundNumber: game.rounds.length, // use length for 0-based index
+    roundNumber: game.rounds.length, 
     questionAskerId: game.currentAskerId,
     question,
     llmResponse: '',
@@ -178,7 +165,6 @@ export async function submitQuestion(
   revalidatePath(`/game/${gameId}/admin`);
   revalidatePath(`/history/${gameId}`);
 
-  // Start LLM response generation asynchronously
   generateAndSaveLLMResponse(gameId, question, persona, action);
 }
 
@@ -241,11 +227,11 @@ export async function scoreRound(gameId: string) {
     const isActionCorrect = submission.action === correctAction;
     let points = 0;
     if (isPersonaCorrect && isActionCorrect) {
-      points = 100; // Both correct
+      points = 100; 
     } else if (isPersonaCorrect || isActionCorrect) {
-      points = 25; // One correct
+      points = 25; 
     } else {
-      points = -10; // Both incorrect
+      points = -10; 
     }
     if (game.players[playerId]) {
       game.players[playerId].score += points;
