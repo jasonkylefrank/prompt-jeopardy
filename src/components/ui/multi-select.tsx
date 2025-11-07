@@ -21,6 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 type Option = {
   category: string;
@@ -33,6 +34,7 @@ type MultiSelectProps = {
   onChange: (selected: string[]) => void;
   className?: string;
   placeholder?: string;
+  max?: number;
 };
 
 export function MultiSelect({
@@ -41,19 +43,32 @@ export function MultiSelect({
   onChange,
   className,
   placeholder = "Select...",
+  max,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const { toast } = useToast();
 
   const handleSelect = (currentValue: string) => {
-    const newSelected = selected.includes(currentValue)
-      ? selected.filter((item) => item !== currentValue)
-      : [...selected, currentValue];
-    onChange(newSelected);
+    if (selected.includes(currentValue)) {
+      onChange(selected.filter((item) => item !== currentValue));
+    } else {
+      if (max && selected.length >= max) {
+        toast({
+            title: "Limit Reached",
+            description: `You can only select up to ${max} items.`,
+            variant: "destructive"
+        })
+      } else {
+        onChange([...selected, currentValue]);
+      }
+    }
   };
 
   const isCategorized = (option: any): option is Option => {
     return typeof option === 'object' && option !== null && 'category' in option && Array.isArray(option.options);
   }
+  
+  const isMaxReached = max !== undefined && selected.length >= max;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,7 +77,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between h-auto", className)}
+          className={cn("w-full justify-between h-auto min-h-10", className)}
         >
           <div className="flex flex-wrap items-center gap-1">
             {selected.length > 0 ? (
@@ -91,6 +106,8 @@ export function MultiSelect({
                       <CommandItem
                         key={item}
                         onSelect={() => handleSelect(item)}
+                        disabled={isMaxReached && !selected.includes(item)}
+                        className={cn(isMaxReached && !selected.includes(item) ? 'cursor-not-allowed text-muted-foreground' : '')}
                       >
                         <Check
                           className={cn(
@@ -103,7 +120,7 @@ export function MultiSelect({
                         {item}
                       </CommandItem>
                     ))}
-                    {index < options.length - 1 && <CommandSeparator />}
+                    {index < options.length - 1 && options.length > 1 && <CommandSeparator />}
                   </CommandGroup>
                 )
               }
@@ -112,6 +129,8 @@ export function MultiSelect({
                     <CommandItem
                         key={option}
                         onSelect={() => handleSelect(option)}
+                        disabled={isMaxReached && !selected.includes(option)}
+                         className={cn(isMaxReached && !selected.includes(option) ? 'cursor-not-allowed text-muted-foreground' : '')}
                     >
                         <Check
                         className={cn(

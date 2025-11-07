@@ -57,7 +57,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const [persona, setPersona] = useState(game.liveQuestion.persona || "");
   const [action, setAction] = useState(game.liveQuestion.action || "");
   const [personaPool, setPersonaPool] = useState<string[]>(game.liveQuestion.personaPool || []);
-  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || []);
+  const [actionPool, setActionPool] = useState<string[]>(game.liveQuestion.actionPool || ACTIONS);
 
   useEffect(() => {
     const storedPlayer = sessionStorage.getItem("player");
@@ -118,7 +118,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     setPersona('');
     setAction('');
     setPersonaPool([]);
-    setActionPool([]);
+    setActionPool(ACTIONS); // Pre-select all actions for the next round
     setLoading(false);
   };
   
@@ -164,7 +164,6 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   };
   
   const isHost = user?.id === game.hostId;
-  const allPersonas = PERSONAS.flatMap(p => p.options);
 
   if (!user) {
     return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
@@ -196,8 +195,14 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         <h3 className="flex items-center gap-2 font-headline text-lg font-semibold"><Settings /> {title}</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-                <Label>Persona Pool</Label>
-                <MultiSelect options={PERSONAS} selected={personaPool} onChange={setPersonaPool} placeholder="Select personas for the pool..." />
+                <Label>Persona Pool (select up to 6)</Label>
+                <MultiSelect 
+                    options={PERSONAS} 
+                    selected={personaPool} 
+                    onChange={setPersonaPool} 
+                    placeholder="Select personas for the pool..."
+                    max={6}
+                />
             </div>
              <div className="space-y-2">
                 <Label>Correct Persona</Label>
@@ -209,8 +214,14 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         </div>
          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-                <Label>Action Pool</Label>
-                <MultiSelect options={ACTIONS} selected={actionPool} onChange={setActionPool} placeholder="Select actions for the pool..." />
+                <Label>Action Pool (select up to 5)</Label>
+                <MultiSelect 
+                    options={ACTIONS} 
+                    selected={actionPool} 
+                    onChange={setActionPool} 
+                    placeholder="Select actions for the pool..."
+                    max={5}
+                />
             </div>
              <div className="space-y-2">
                 <Label>Correct Action</Label>
@@ -323,7 +334,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                   <CardDescription>
                     See who has submitted their answers for Round {currentRound.roundNumber}.
                   </CardDescription>
-                </CardHeader>
+                </Header>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {players.map(player => (
