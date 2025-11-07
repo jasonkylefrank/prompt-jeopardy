@@ -194,7 +194,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                 </Select>
             </div>
         </div>
-         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+         <div className="space-y-4">
             <div className="space-y-2">
                 <Label>Action Pool (select up to 5)</Label>
                 <MultiSelect 
@@ -203,6 +203,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                     onChange={setActionPool} 
                     placeholder="Select actions for the pool..."
                     max={5}
+                    className="w-full"
                 />
             </div>
              <div className="space-y-2">
