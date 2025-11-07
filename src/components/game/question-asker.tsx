@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateLiveQuestion } from "@/app/actions";
+import { updateLiveQuestion, submitQuestion } from "@/app/actions";
 import { Textarea } from "../ui/textarea";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { PenSquare } from "lucide-react";
+import { Loader2, PenSquare, Send } from "lucide-react";
+import { Button } from "../ui/button";
 
 type QuestionAskerProps = {
     gameId: string;
@@ -14,6 +15,7 @@ type QuestionAskerProps = {
 
 export function QuestionAsker({ gameId }: QuestionAskerProps) {
     const [question, setQuestion] = useState('');
+    const [loading, setLoading] = useState(false);
     const debouncedQuestion = useDebounce(question, 300); // 300ms debounce delay
 
     useEffect(() => {
@@ -24,6 +26,12 @@ export function QuestionAsker({ gameId }: QuestionAskerProps) {
         }
     }, [debouncedQuestion, gameId]);
 
+    const handleSubmit = async () => {
+        setLoading(true);
+        await submitQuestion(gameId);
+        // The parent will re-render due to game state change, no need to setLoading(false) here
+    }
+
     return (
         <Card className="bg-primary/10">
             <CardHeader>
@@ -32,10 +40,10 @@ export function QuestionAsker({ gameId }: QuestionAskerProps) {
                     Your Turn to Ask!
                 </CardTitle>
                 <CardDescription>
-                    Type your question for the AI below. Everyone will see it as you type. The host will lock it in when you're ready.
+                    Type your question for the AI below. When you're ready, submit it.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
                 <Textarea
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
@@ -44,6 +52,10 @@ export function QuestionAsker({ gameId }: QuestionAskerProps) {
                     rows={4}
                     autoFocus
                 />
+                <Button onClick={handleSubmit} disabled={loading || question.length < 5}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                    Submit Question
+                </Button>
             </CardContent>
         </Card>
     );

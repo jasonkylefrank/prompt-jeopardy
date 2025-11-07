@@ -99,7 +99,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
         </div>
 
         <div className="lg:col-span-1">
-          {game.status === "answering" && !mySubmission && currentUser.id !== game.currentAskerId && currentRound && (
+          {game.status === "answering" && !mySubmission && currentRound && (
             <AnswerSelector 
               gameId={game.id} 
               playerId={currentUser.id} 
@@ -108,7 +108,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
             />
           )}
 
-          {game.status !== "answering" || (game.status === "answering" && (mySubmission || currentUser.id === game.currentAskerId)) ? (
+          {game.status !== "answering" || (game.status === "answering" && mySubmission) ? (
              <Card>
                 <CardHeader>
                   <CardTitle className="font-headline text-xl">Status</CardTitle>

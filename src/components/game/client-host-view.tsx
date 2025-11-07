@@ -5,7 +5,6 @@ import {
   advanceGameState,
   scoreRound,
   setRoundData,
-  submitQuestion,
 } from "@/app/actions";
 import type { Game } from "@/lib/types";
 import { useGameState } from "@/hooks/use-game-state";
@@ -34,7 +33,6 @@ import {
   Loader2,
   Copy,
   Users,
-  Send,
   Play,
   CheckCircle,
   Trophy,
@@ -56,7 +54,6 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
 
   const [persona, setPersona] = useState(game.liveQuestion.persona || "");
   const [action, setAction] = useState(game.liveQuestion.action || "");
-
   const [personaPool, setPersonaPool] = useState<string[]>(
     game.liveQuestion.personaPool || []
   );
@@ -142,20 +139,6 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     await advanceGameState(game.id, 'asking', { persona, action, personaPool, actionPool });
     setLoading(false);
   }
-
-  const handleSubmitQuestion = async () => {
-    if (!game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "A question, persona, and action are required to start the round.",
-      });
-      return;
-    }
-    setLoading(true);
-    await submitQuestion(game.id);
-    setLoading(false);
-  };
 
   const players = Object.values(game.players).filter(p => !p.isHost);
   const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
@@ -303,11 +286,6 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                     <p className="text-sm text-muted-foreground">
                         Round Persona: <span className="font-semibold">{game.liveQuestion.persona}</span> | Action: <span className="font-semibold">{game.liveQuestion.action}</span>
                     </p>
-
-                    <Button onClick={handleSubmitQuestion} disabled={loading || !game.liveQuestion.text}>
-                      {loading ? <Loader2 className="animate-spin" /> : <Send />}
-                      <span>Lock In Question & Start Answering</span>
-                    </Button>
                  </div>
               )}
               {game.status === 'responding' && (
@@ -396,5 +374,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    

@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useTypedSpeech } from "@/hooks/use-typed-speech";
-import { Loader2, Volume2 } from "lucide-react";
+import { Loader2, Mic } from "lucide-react";
 
 type LLMResponseViewerProps = {
   text: string;
@@ -26,7 +27,7 @@ export function LLMResponseViewer({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Volume2 className={`h-4 w-4 ${isSpeaking ? 'text-primary animate-pulse' : ''}`} />
+        <Mic className={`h-4 w-4 ${isSpeaking ? 'text-primary animate-pulse' : ''}`} />
         <span>AI Response:</span>
       </div>
       <p className="min-h-[96px] text-xl/relaxed font-medium text-foreground">
