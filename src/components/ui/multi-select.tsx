@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export function MultiSelect({
           <div className="flex flex-wrap items-center gap-1">
             {selected.length > 0 ? (
               selected.map((item) => (
-                <Badge key={item} variant="secondary" className="mr-1">
+                <Badge key={item} variant="secondary" className="mr-1 mb-1 whitespace-normal">
                   {item}
                 </Badge>
               ))

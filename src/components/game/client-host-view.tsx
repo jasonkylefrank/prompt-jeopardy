@@ -335,7 +335,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                   <CardDescription>
                     See who has submitted their answers for Round {currentRound.roundNumber}.
                   </CardDescription>
-                </CardHeader>
+                </Header>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {players.map(player => (
@@ -389,5 +389,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    
