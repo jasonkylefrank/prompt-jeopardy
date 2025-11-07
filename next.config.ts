@@ -40,15 +40,6 @@ const nextConfig: NextConfig = {
     if (!isServer) {
       // Ensures HMR works correctly in this environment
       config.watchOptions.poll = 300;
-      config.devServer = {
-        ...(config.devServer || {}),
-        webSocketURL: {
-          protocol: 'wss',
-          port: 443,
-          hostname: process.env.NEXT_PUBLIC_HOST_URL?.split('//')[1] || 'localhost',
-          pathname: '/_next/webpack-hmr',
-        },
-      };
     }
     return config;
   },
