@@ -96,6 +96,8 @@ export function ClientHistoryView({ game }: { game: Game }) {
   const currentStep = steps[currentStepIndex];
   
   const playersAtStep = calculateScoresAtStep(game, currentStep);
+  const contestantPlayers = Object.values(playersAtStep).filter(p => !p.isHost);
+
 
   const handleNext = () =>
     setCurrentStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
@@ -198,7 +200,7 @@ export function ClientHistoryView({ game }: { game: Game }) {
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
                     {Object.values(game.players).map((player) => (
-                        <ContestantCard key={player.id} player={player} />
+                       !player.isHost && <ContestantCard key={player.id} player={player} />
                     ))}
                 </CardContent>
             </Card>
@@ -210,7 +212,7 @@ export function ClientHistoryView({ game }: { game: Game }) {
                     <CardDescription>Scores as of this step</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Leaderboard players={Object.values(playersAtStep)} />
+                    <Leaderboard players={contestantPlayers} />
                 </CardContent>
             </Card>
         </div>

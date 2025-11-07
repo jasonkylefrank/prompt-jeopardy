@@ -51,7 +51,8 @@ export default function Home() {
   };
 
   const handleNameSubmit = async (name: string) => {
-    const player: Omit<Player, "score"> = {
+    // The user's ID is a simple random string for session identification
+    const user: Omit<Player, "score"> = {
       id: Math.random().toString(36).substring(2, 9),
       name,
     };
@@ -59,11 +60,12 @@ export default function Home() {
     if (dialogAction === "create") {
       setLoading(true);
       try {
-        const newGameId = await createGame(player);
-        // Store user info for the session
-        sessionStorage.setItem("player", JSON.stringify(player));
+        const newGameId = await createGame(user);
+        // The host's info is also stored to identify them on the host page
+        sessionStorage.setItem("player", JSON.stringify(user));
         router.refresh();
-        router.push(`/game/${newGameId}/admin`);
+        // Redirect to the new host page
+        router.push(`/game/${newGameId}/host`);
       } catch (err) {
         setCreateError("Failed to create game. Please try again.");
         setLoading(false);
@@ -73,14 +75,14 @@ export default function Home() {
     if (dialogAction === "join") {
       setJoinLoading(true);
       try {
-        const result = await joinGame(gameId.toUpperCase(), player);
+        const result = await joinGame(gameId.toUpperCase(), user);
 
         if (!result.success) {
           setJoinError(result.message);
           setJoinLoading(false);
         } else {
-          // Store user info for the session
-          sessionStorage.setItem("player", JSON.stringify(player));
+          // Store contestant info for the session
+          sessionStorage.setItem("player", JSON.stringify(user));
           // Refresh the page to ensure sessionStorage is updated before navigation
           router.refresh();
           router.push(`/game/${gameId.toUpperCase()}`);
@@ -117,7 +119,7 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-headline text-2xl">
                 <PartyPopper className="h-6 w-6 text-accent" />
-                Create a New Game
+                Set up a New Game
               </CardTitle>
               <CardDescription>
                 Start a new game and invite your friends to play.
@@ -142,7 +144,7 @@ export default function Home() {
                 ) : (
                   <Zap className="mr-2 h-5 w-5" />
                 )}
-                Create Game
+                Set up New Game
               </Button>
             </CardFooter>
           </Card>

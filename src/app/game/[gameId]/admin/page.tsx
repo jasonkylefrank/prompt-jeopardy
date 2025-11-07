@@ -1,20 +1,20 @@
 
 import { getGameState } from "@/app/actions";
-import { ClientAdminView } from "@/components/game/client-admin-view";
+import { ClientHostView } from "@/components/game/client-host-view";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import { AppLogo } from "@/components/icons";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-type AdminPageProps = {
+type HostPageProps = {
   params: {
     gameId: string;
   };
 };
 
-export default async function AdminPage({ params }: AdminPageProps) {
-  // In Next.js 15, params is a promise.
+// This will now be the Host page
+export default async function HostPage({ params }: HostPageProps) {
   const resolvedParams = await Promise.resolve(params);
   const game = await getGameState(resolvedParams.gameId);
 
@@ -36,5 +36,5 @@ export default async function AdminPage({ params }: AdminPageProps) {
     );
   }
 
-  return <ClientAdminView initialGame={game} />;
+  return <ClientHostView initialGame={game} />;
 }

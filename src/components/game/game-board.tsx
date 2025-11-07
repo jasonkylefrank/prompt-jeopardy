@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Game, User } from "@/lib/types";
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { AppLogo } from "../icons";
 import { Loader2, Trophy } from "lucide-react";
 import ConfettiFX from "./confetti-fx";
+import { QuestionAsker } from "./question-asker";
 
 type GameBoardProps = {
   game: Game;
@@ -16,16 +18,17 @@ type GameBoardProps = {
 
 export function GameBoard({ game, currentUser }: GameBoardProps) {
   const players = Object.values(game.players);
-  const currentRound = game.rounds[game.rounds.length - 1];
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
   const mySubmission = currentRound?.submissions[currentUser.id];
   
   const wasCorrect = currentRound?.isScored && mySubmission?.persona === currentRound.correctAnswer.persona && mySubmission?.action === currentRound.correctAnswer.action;
+  const isMyTurnToAsk = game.currentAskerId === currentUser.id && game.status === 'asking';
 
   const renderStatusMessage = () => {
     switch (game.status) {
       case "asking":
-        const askerName = game.players[game.currentAskerId]?.name || "a player";
-        if (game.currentAskerId === currentUser.id) {
+        const askerName = game.players[game.currentAskerId || '']?.name || "a player";
+        if (isMyTurnToAsk) {
           return "It's your turn to ask a question!";
         }
         return `Waiting for ${askerName} to ask a question...`;
@@ -65,43 +68,49 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
           <Card className="min-h-[400px]">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">
-                Round {game.rounds.length}
+                Round {game.currentRound}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {game.status === 'asking' && (
-                <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-muted-foreground">
-                    <p className="flex items-center gap-2 text-2xl"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
-                    {game.currentAskerId !== currentUser.id && <p>Get ready for their question!</p>}
-                </div>
-              )}
-              {currentRound && game.status !== 'asking' && (
-                 <>
-                    <p className="mb-2 text-sm text-muted-foreground">Question:</p>
-                    <p className="mb-6 text-lg font-semibold">"{currentRound.question}"</p>
-                    <LLMResponseViewer
-                        text={currentRound.llmResponse}
-                        isResponding={game.status === 'responding'}
-                    />
-                 </>
+              {isMyTurnToAsk ? (
+                <QuestionAsker gameId={game.id} />
+              ) : (
+                <>
+                  {game.status === 'asking' && (
+                    <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-muted-foreground">
+                        <p className="flex items-center gap-2 text-2xl"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                        <p className="text-lg font-semibold italic">"{game.liveQuestion.text || '...'}"</p>
+                    </div>
+                  )}
+                  {(game.status !== 'asking') && (
+                    <>
+                        <p className="mb-2 text-sm text-muted-foreground">Question:</p>
+                        <p className="mb-6 text-lg font-semibold">"{currentRound?.question || game.liveQuestion.text}"</p>
+                        <LLMResponseViewer
+                            text={currentRound?.llmResponse || ""}
+                            isResponding={game.status === 'responding'}
+                        />
+                    </>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
         </div>
 
         <div className="lg:col-span-1">
-          {game.status === "answering" && !mySubmission && (
+          {game.status === "answering" && !mySubmission && currentUser.id !== game.currentAskerId && (
             <AnswerSelector gameId={game.id} playerId={currentUser.id} />
           )}
 
-          {game.status !== "answering" || (game.status === "answering" && mySubmission) ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-headline text-xl">Status</CardTitle>
-              </CardHeader>
-              <CardContent className="flex items-center justify-center text-center text-muted-foreground">
-                <p className="flex items-center gap-2"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
-              </CardContent>
+          {game.status !== "answering" || (game.status === "answering" && (mySubmission || currentUser.id === game.currentAskerId)) ? (
+             <Card>
+                <CardHeader>
+                  <CardTitle className="font-headline text-xl">Status</CardTitle>
+                </CardHeader>
+                <CardContent className="flex min-h-[100px] items-center justify-center text-center text-muted-foreground">
+                  <p className="flex items-center gap-2"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                </CardContent>
             </Card>
           ) : null}
 

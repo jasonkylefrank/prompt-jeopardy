@@ -35,11 +35,17 @@ export type GameStatus =
 export interface Game {
   id: string;
   hostId: string;
+  hostName: string;
   status: GameStatus;
   players: Record<string, Player>; // Player ID -> Player
   rounds: Round[];
   currentRound: number;
-  currentAskerId: string;
+  currentAskerId: string | null;
+  liveQuestion: {
+    text: string;
+    persona: string;
+    action: string;
+  };
 }
 
 // Simplified user for client-side session

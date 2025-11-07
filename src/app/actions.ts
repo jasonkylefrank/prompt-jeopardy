@@ -4,7 +4,7 @@
 import { revalidatePath } from 'next/cache';
 import type { Game, Player, Submission } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { firestore } from '@/firebase/server';
 
 async function saveGame(game: Game): Promise<void> {
@@ -14,20 +14,20 @@ async function saveGame(game: Game): Promise<void> {
 
 // --- GAME CREATION AND JOINING ---
 
-export async function createGame(host: Omit<Player, 'score'>): Promise<string> {
+export async function createGame(hostData: Omit<Player, 'score' | 'isHost'>): Promise<string> {
   const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const hostPlayer: Player = { ...host, score: 0, isHost: true };
+  const host: Player = { ...hostData, score: 0, isHost: true };
 
   const newGame: Game = {
     id: gameId,
     hostId: host.id,
+    hostName: host.name,
     status: 'lobby',
-    players: {
-      [host.id]: hostPlayer,
-    },
+    players: {},
     rounds: [],
     currentRound: 0,
-    currentAskerId: host.id,
+    currentAskerId: null,
+    liveQuestion: { text: '', persona: '', action: '' },
   };
 
   await saveGame(newGame);
@@ -48,12 +48,12 @@ export async function joinGame(
   }
   
   if (!game.players[playerData.id]) {
-    game.players[playerData.id] = { ...playerData, score: 0 };
+    game.players[playerData.id] = { ...playerData, score: 0, isHost: false };
     await saveGame(game);
   }
 
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/game/${gameId}/host`);
   return { success: true, message: 'Joined game.' };
 }
 
@@ -62,7 +62,7 @@ export async function joinGame(
 export async function getGameState(gameId: string): Promise<Game | null> {
   const gameDocRef = doc(firestore, 'games', gameId);
   const gameDoc = await getDoc(gameDocRef);
-  if (!gameDoc.exists) {
+  if (!gameDoc.exists()) {
     return null;
   }
   return gameDoc.data() as Game;
@@ -87,61 +87,92 @@ export async function advanceGameState(
 
   game.status = newStatus;
 
+  // Logic for advancing to the 'asking' state
   if (newStatus === 'asking') {
+    // If it's the start of the game or the end of a round
+    if (game.currentRound === 0 || game.status !== 'scoring') {
+       game.currentRound += 1;
+    }
+    
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
     
     if (playerIds.length > 0) {
-      const currentAskerIndex = playerIds.indexOf(game.currentAskerId);
+      // Determine the next asker
+      const currentAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
       const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
       game.currentAskerId = playerIds[nextAskerIndex];
-
-      if (nextAskerIndex === 0) {
-        game.currentRound += 1;
-      }
     } else {
-      game.currentAskerId = game.hostId;
+      // No non-host players, maybe reset or handle this case
+      game.currentAskerId = null;
     }
+    // Reset live question for the new round
+    game.liveQuestion = { text: '', persona: '', action: '' };
+  }
+
+  if (newStatus === 'finished') {
+    // any cleanup for game end
   }
 
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/game/${gameId}/host`);
   revalidatePath(`/history/${gameId}`);
   revalidatePath(`/history`);
 }
 
+// --- LIVE QUESTION ACTIONS ---
+export async function updateLiveQuestion(gameId: string, questionText: string) {
+    const gameDocRef = doc(firestore, 'games', gameId);
+    await updateDoc(gameDocRef, { 'liveQuestion.text': questionText });
+    revalidatePath(`/game/${gameId}`);
+    revalidatePath(`/game/${gameId}/host`);
+}
+
+export async function setRoundPersonaAndAction(gameId: string, persona: string, action: string) {
+    const gameDocRef = doc(firestore, 'games', gameId);
+    await updateDoc(gameDocRef, {
+        'liveQuestion.persona': persona,
+        'liveQuestion.action': action,
+    });
+    revalidatePath(`/game/${gameId}`);
+    revalidatePath(`/game/${gameId}/host`);
+}
+
 // --- ROUND ACTIONS ---
 
-export async function submitQuestion(
-  gameId: string,
-  {
-    question,
-    persona,
-    action,
-  }: { question: string; persona: string; action: string }
-) {
+export async function submitQuestion(gameId: string) {
   const game = await getGameState(gameId);
-  if (!game) return;
+  if (!game || !game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action || !game.currentAskerId) return;
 
   game.status = 'responding';
   const newRound = {
-    roundNumber: game.rounds.length, 
+    roundNumber: game.currentRound, 
     questionAskerId: game.currentAskerId,
-    question,
+    question: game.liveQuestion.text,
     llmResponse: '',
     submissions: {},
     isScored: false,
-    correctAnswer: { persona, action },
+    correctAnswer: { 
+      persona: game.liveQuestion.persona,
+      action: game.liveQuestion.action,
+    },
   };
-  game.rounds.push(newRound);
+
+  // If it's a new round, push it. Otherwise, update the existing one if needed.
+  const existingRoundIndex = game.rounds.findIndex(r => r.roundNumber === game.currentRound);
+  if (existingRoundIndex > -1) {
+    game.rounds[existingRoundIndex] = newRound;
+  } else {
+    game.rounds.push(newRound);
+  }
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/game/${gameId}/host`);
   revalidatePath(`/history/${gameId}`);
 
-  generateAndSaveLLMResponse(gameId, question, persona, action);
+  generateAndSaveLLMResponse(gameId, game.liveQuestion.text, game.liveQuestion.persona, game.liveQuestion.action);
 }
 
 async function generateAndSaveLLMResponse(
@@ -159,13 +190,13 @@ async function generateAndSaveLLMResponse(
   const game = await getGameState(gameId);
   if (!game) return;
 
-  const currentRound = game.rounds[game.rounds.length - 1];
-  if (currentRound) {
-    currentRound.llmResponse = llmResult.response;
+  const currentRoundIndex = game.rounds.findIndex(r => r.roundNumber === game.currentRound);
+  if (currentRoundIndex > -1) {
+    game.rounds[currentRoundIndex].llmResponse = llmResult.response;
     game.status = 'answering';
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
-    revalidatePath(`/game/${gameId}/admin`);
+    revalidatePath(`/game/${gameId}/host`);
     revalidatePath(`/history/${gameId}`);
   }
 }
@@ -178,12 +209,12 @@ export async function submitAnswer(
   const game = await getGameState(gameId);
   if (!game || game.status !== 'answering') return;
 
-  const currentRound = game.rounds[game.rounds.length - 1];
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
   if (currentRound && !currentRound.submissions[playerId]) {
     currentRound.submissions[playerId] = submission;
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
-    revalidatePath(`/game/${gameId}/admin`);
+    revalidatePath(`/game/${gameId}/host`);
     revalidatePath(`/history/${gameId}`);
   }
 }
@@ -192,25 +223,26 @@ export async function scoreRound(gameId: string) {
   const game = await getGameState(gameId);
   if (!game) return;
 
-  const currentRound = game.rounds[game.rounds.length - 1];
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
   if (!currentRound || currentRound.isScored) return;
 
   const { persona: correctPersona, action: correctAction } =
     currentRound.correctAnswer;
 
   Object.entries(currentRound.submissions).forEach(([playerId, submission]) => {
-    const isPersonaCorrect = submission.persona === correctPersona;
-    const isActionCorrect = submission.action === correctAction;
-    let points = 0;
-    if (isPersonaCorrect && isActionCorrect) {
-      points = 100; 
-    } else if (isPersonaCorrect || isActionCorrect) {
-      points = 25; 
-    } else {
-      points = -10; 
-    }
-    if (game.players[playerId]) {
-      game.players[playerId].score += points;
+    // Only score non-host players
+    if (game.players[playerId] && !game.players[playerId].isHost) {
+        const isPersonaCorrect = submission.persona === correctPersona;
+        const isActionCorrect = submission.action === correctAction;
+        let points = 0;
+        if (isPersonaCorrect && isActionCorrect) {
+        points = 100; 
+        } else if (isPersonaCorrect || isActionCorrect) {
+        points = 25; 
+        } else {
+        points = -10; 
+        }
+        game.players[playerId].score += points;
     }
   });
 
@@ -218,6 +250,6 @@ export async function scoreRound(gameId: string) {
   game.status = 'scoring';
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/admin`);
+  revalidatePath(`/game/${gameId}/host`);
   revalidatePath(`/history/${gameId}`);
 }

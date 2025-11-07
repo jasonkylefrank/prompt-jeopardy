@@ -22,16 +22,23 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
   const { game } = useGameState(initialGame);
 
   useEffect(() => {
+    // Check if player info is in session storage
     const storedPlayer = sessionStorage.getItem("player");
     if (storedPlayer) {
-      setUser(JSON.parse(storedPlayer));
-      setLoading(false);
+      const playerData = JSON.parse(storedPlayer);
+      // Verify this player is actually in the game state
+      if (game.players[playerData.id] || game.hostId === playerData.id) {
+        setUser(playerData);
+      } else {
+        // Stale player data, prompt to join
+        setIsRejoinDialogOpen(true);
+      }
     } else {
       // If no player in session, prompt them to "re-join" by entering their name
-      setLoading(false);
       setIsRejoinDialogOpen(true);
     }
-  }, []);
+    setLoading(false);
+  }, [game.players, game.hostId]);
 
   const handleRejoin = async (name: string) => {
      const player: Omit<Player, "score"> = {
@@ -56,23 +63,31 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
     );
   }
 
-  if (!user) {
+  // If we are still waiting for a user to identify themselves
+  if (!user && isRejoinDialogOpen) {
     return (
       <>
         <NameDialog
           isOpen={isRejoinDialogOpen}
-          onOpenChange={setIsRejoinDialogOpen}
+          // Prevent closing the dialog by clicking outside
+          onOpenChange={(open) => !open && handleRejoin ? null : setIsRejoinDialogOpen(open)}
           onNameSubmit={handleRejoin}
           loading={false}
         />
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
           <AppLogo className="h-20 w-20 text-primary" />
           <p className="text-lg text-muted-foreground">
-            Please enter your name to join.
+            Please enter your name to join the game.
           </p>
         </div>
       </>
     );
+  }
+  
+  if (!user) {
+    return <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
+      <Loader2 className="animate-spin" /> Verifying...
+    </div>
   }
 
   if (game.status === "lobby") {

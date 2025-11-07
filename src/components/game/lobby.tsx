@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Game } from "@/lib/types";
@@ -43,11 +44,11 @@ export function Lobby({ game }: LobbyProps) {
         </CardHeader>
         <CardContent>
           <h3 className="mb-4 flex items-center justify-center gap-2 text-lg font-semibold text-muted-foreground">
-            <Users /> Players in Lobby ({players.length})
+            <Users /> Contestants in Lobby ({players.length})
           </h3>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {players.map((player) => (
-              <ContestantCard key={player.id} player={player} />
+              !player.isHost && <ContestantCard key={player.id} player={player} />
             ))}
           </div>
         </CardContent>
