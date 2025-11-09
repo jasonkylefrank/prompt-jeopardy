@@ -102,6 +102,17 @@ export async function advanceToNextRound(
     actionPool: options.actionPool,
     phases: [],
   };
+
+  const newPhase: Phase = {
+    phaseNumber: game.currentPhaseNumber,
+    questionAskerId: '', // Will be set when asker is determined
+    question: '',
+    llmResponse: '',
+    submissions: {},
+    isScored: false,
+  };
+  newRound.phases.push(newPhase);
+  
   game.rounds.push(newRound);
 
   // Set first asker for the new round
@@ -110,6 +121,8 @@ export async function advanceToNextRound(
     const lastAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
     const nextAskerIndex = (lastAskerIndex + 1) % playerIds.length;
     game.currentAskerId = playerIds[nextAskerIndex];
+    // Also set it in the phase
+    newPhase.questionAskerId = game.currentAskerId;
   }
 
   await saveGame(game);
@@ -131,7 +144,7 @@ export async function finishGame(gameId: string) {
 
 // --- PHASE ACTIONS ---
 
-export async function submitQuestion(gameId: string, questionText: string, askerId: string) {
+export async function submitQuestion(gameId: string, questionText: string, askerId: string, isFinal: boolean) {
     const game = await getGameState(gameId);
     if (!game) return;
   
@@ -142,27 +155,22 @@ export async function submitQuestion(gameId: string, questionText: string, asker
     }
   
     const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
-    if (!currentRound) return;
-  
-    game.status = 'responding';
-    
-    const newPhase: Phase = {
-      phaseNumber: game.currentPhaseNumber,
-      questionAskerId: askerId,
-      question: questionText,
-      llmResponse: '',
-      submissions: {},
-      isScored: false,
-    };
-  
-    currentRound.phases.push(newPhase);
+    const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
+
+    if (!currentPhase) return;
+
+    // Update question text
+    currentPhase.question = questionText;
+
+    if (isFinal) {
+      game.status = 'responding';
+      // Start LLM generation in the background
+      generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
+    }
   
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/host`);
-  
-    // Start LLM generation in the background
-    generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
 }
 
 async function generateAndSaveLLMResponse(
@@ -226,8 +234,6 @@ export async function scorePhase(gameId: string) {
 
   const { persona: correctPersona, action: correctAction } = currentRound.correctAnswer;
 
-  let someoneGuessedCorrectly = false;
-
   Object.entries(currentPhase.submissions).forEach(([playerId, submission]) => {
     if (game.players[playerId] && !game.players[playerId].isHost) {
       const isPersonaCorrect = submission.persona === correctPersona;
@@ -235,7 +241,6 @@ export async function scorePhase(gameId: string) {
       let points = 0;
       if (isPersonaCorrect && isActionCorrect) {
         points = 100;
-        someoneGuessedCorrectly = true;
       } else if (isPersonaCorrect || isActionCorrect) {
         points = 25;
       } else {
@@ -270,36 +275,32 @@ export async function advanceAfterScoring(gameId: string) {
   if (correctGuessMade) {
     game.status = 'round-finished';
   } else {
+    // Setup for the next phase in the same round
     game.status = 'asking';
     game.currentPhaseNumber += 1;
+    
+    // Move to the next asker
     const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
     if (playerIds.length > 0 && game.currentAskerId) {
       const currentAskerIndex = playerIds.indexOf(game.currentAskerId);
       const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
       game.currentAskerId = playerIds[nextAskerIndex];
     }
+
+    // Create a new phase for the next question
+    const newPhase: Phase = {
+        phaseNumber: game.currentPhaseNumber,
+        questionAskerId: game.currentAskerId || '',
+        question: '',
+        llmResponse: '',
+        submissions: {},
+        isScored: false,
+    };
+    currentRound.phases.push(newPhase);
+
   }
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);
-}
-
-// This function is no longer used for live updates but might be useful for other things.
-export async function updateLiveQuestion(gameId: string, question: string) {
-  const game = await getGameState(gameId);
-  if (!game) return;
-
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
-  if (currentRound) {
-    // This part is tricky because phases are now an array.
-    // This function might need to be re-thought or deprecated.
-    // For now, let's assume we update the *last* phase if it exists, or do nothing.
-    const currentPhase = currentRound.phases[currentRound.phases.length - 1];
-    if (currentPhase && !currentPhase.llmResponse) { // only update if not answered
-        currentPhase.question = question;
-        await saveGame(game);
-        revalidatePath(`/game/${gameId}/host`);
-    }
-  }
 }

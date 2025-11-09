@@ -61,7 +61,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
             <h1 className="font-headline text-5xl font-bold">Game Over!</h1>
             <p className="mt-2 text-lg text-muted-foreground">Final Scores:</p>
             <div className="mt-8 w-full">
-                <Leaderboard players={players} />
+                <Leaderboard players={Object.values(game.players).filter(p => !p.isHost)} />
             </div>
         </div>
     )
@@ -93,12 +93,16 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
             </CardHeader>
             <CardContent>
               {isMyTurnToAsk ? (
-                <QuestionAsker gameId={game.id} />
+                <QuestionAsker gameId={game.id} askerId={currentUser.id} />
               ) : (
                 <>
-                  {game.status === 'asking' && (
-                    <div className="flex h-64 flex-col items-center justify-center gap-4 text-center text-muted-foreground">
-                        <p className="flex items-center gap-2 text-2xl"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                  {game.status === 'asking' && currentPhase && (
+                    <div className="flex h-64 flex-col justify-center gap-4 text-center">
+                        <p className="flex items-center justify-center gap-2 text-2xl text-muted-foreground"><Loader2 className="animate-spin" /> {renderStatusMessage()}</p>
+                        <div className="mt-4">
+                            <p className="text-sm text-muted-foreground">Live question:</p>
+                            <p className="min-h-[40px] text-lg font-semibold italic">"{currentPhase.question || '...'}"</p>
+                        </div>
                     </div>
                   )}
                   {(game.status !== 'asking' && currentPhase) && (

@@ -58,7 +58,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const [nextPersona, setNextPersona] = useState("");
   const [nextAction, setNextAction] = useState("");
   const [nextPersonaPool, setNextPersonaPool] = useState<string[]>([]);
-  const [nextActionPool, setNextActionPool] = useState<string[]>(ACTIONS);
+  const [nextActionPool, setNextActionPool] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -66,6 +66,9 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     if (storedPlayer) {
       setUser(JSON.parse(storedPlayer));
     }
+    // Pre-fill pools with all options for convenience
+    setNextPersonaPool(PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options)));
+    setNextActionPool(ACTIONS);
   }, []);
 
   const handleStartFirstRound = async () => {
@@ -121,7 +124,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const resetRoundSetup = () => {
     setNextPersona('');
     setNextAction('');
-    setNextPersonaPool([]);
+    setNextPersonaPool(PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options)));
     setNextActionPool(ACTIONS);
   }
 
@@ -147,7 +150,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         <div className="space-y-2">
           <Label>Persona Pool (select up to 6)</Label>
           <MultiSelect 
-            options={PERSONAS} 
+            options={PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options))}
             selected={nextPersonaPool} 
             onChange={setNextPersonaPool} 
             placeholder="Select personas for the pool..."
@@ -267,7 +270,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                       Waiting for question from: <span className="font-bold">{game.players[game.currentAskerId || '']?.name || '...'}</span>
                     </h3>
                      <p className="text-muted-foreground">Live question:</p>
-                    <p className="text-lg font-semibold italic">"{currentPhase?.question || '...'}"</p>
+                    <p className="min-h-[40px] text-lg font-semibold italic">"{currentPhase?.question || '...'}"</p>
                  </div>
               )}
               {game.status === 'responding' && (
@@ -357,7 +360,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Leaderboard players={players} />
+              <Leaderboard players={Object.values(game.players).filter(p => !p.isHost)} />
             </CardContent>
           </Card>
         </div>
@@ -368,5 +371,3 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
-
-    

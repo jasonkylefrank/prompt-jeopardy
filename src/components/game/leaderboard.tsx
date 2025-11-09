@@ -31,10 +31,10 @@ export function Leaderboard({ players }: LeaderboardProps) {
       </TableHeader>
       <TableBody>
         {sortedPlayers.map((player, index) => (
-          <TableRow key={player.id} className={index === 0 ? "bg-amber-500/10" : ""}>
+          <TableRow key={player.id} className={index === 0 && sortedPlayers[0].score > 0 ? "bg-amber-500/10" : ""}>
             <TableCell className="font-bold">
               <div className="flex items-center gap-2">
-                {index === 0 && <Crown className="h-5 w-5 text-amber-400" />}
+                {index === 0 && sortedPlayers[0].score > 0 && <Crown className="h-5 w-5 text-amber-400" />}
                 <span>{index + 1}</span>
               </div>
             </TableCell>

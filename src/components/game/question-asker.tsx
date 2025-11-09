@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { submitQuestion } from "@/app/actions";
 import { Textarea } from "../ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Loader2, PenSquare, Send } from "lucide-react";
 import { Button } from "../ui/button";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type QuestionAskerProps = {
     gameId: string;
@@ -16,12 +17,22 @@ type QuestionAskerProps = {
 export function QuestionAsker({ gameId, askerId }: QuestionAskerProps) {
     const [question, setQuestion] = useState('');
     const [loading, setLoading] = useState(false);
+    const debouncedQuestion = useDebounce(question, 500);
+
+    // Effect to send live updates
+    useEffect(() => {
+        // Don't send initial empty string or if user has submitted
+        if (debouncedQuestion && !loading) {
+            submitQuestion(gameId, debouncedQuestion, askerId, false);
+        }
+    }, [debouncedQuestion, gameId, askerId, loading]);
+
 
     const handleSubmit = async () => {
         if (question.trim().length < 5) return;
         setLoading(true);
         try {
-            await submitQuestion(gameId, question, askerId);
+            await submitQuestion(gameId, question, askerId, true);
         } catch (error) {
             console.error("Failed to submit question:", error);
             setLoading(false); // Only reset loading on error
@@ -37,7 +48,7 @@ export function QuestionAsker({ gameId, askerId }: QuestionAskerProps) {
                     Your Turn to Ask!
                 </CardTitle>
                 <CardDescription>
-                    Type your question for the AI below. When you're ready, submit it.
+                    Type your question for the AI below. When you're ready, submit it to lock it in.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
