@@ -160,7 +160,7 @@ export default function Home() {
                 <CardDescription>
                   Enter the game ID from your host to join the fun.
                 </CardDescription>
-              </Header>
+              </CardHeader>
               <CardContent className="flex-grow space-y-4">
                 <Label htmlFor="game-id">Game ID</Label>
                 <Input
