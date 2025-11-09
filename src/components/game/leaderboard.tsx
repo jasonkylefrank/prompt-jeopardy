@@ -4,58 +4,54 @@
 import type { Player } from "@/lib/types";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Crown } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type LeaderboardProps = {
   players: Player[];
-  horizontal?: boolean;
-  compact?: boolean;
 };
 
-export function Leaderboard({ players, horizontal, compact }: LeaderboardProps) {
+export function Leaderboard({ players }: LeaderboardProps) {
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
-  if (horizontal) {
-    return (
-        <div className={`flex gap-4 ${compact ? 'items-center' : 'flex-col'}`}>
-            {sortedPlayers.map((player, index) => (
-                <div key={player.id} className="flex items-center gap-2">
-                    <span className={`font-bold ${compact ? 'text-sm' : 'text-lg'}`}>{index + 1}.</span>
-                     <Avatar className={`${compact ? 'h-8 w-8' : 'h-10 w-10'}`}>
-                        <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className={`font-semibold ${compact ? 'text-sm' : ''}`}>{player.name}</p>
-                        <p className={`font-bold text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{player.score} pts</p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-  }
-
-
   return (
-    <ol className="space-y-4">
-      {sortedPlayers.map((player, index) => (
-        <li
-          key={player.id}
-          className="flex items-center gap-4 rounded-md p-2 transition-colors"
-        >
-          <span className="text-xl font-bold text-muted-foreground">
-            {index + 1}
-          </span>
-          <Avatar>
-            <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-grow">
-            <p className="font-semibold">{player.name}</p>
-          </div>
-          <div className="flex items-center gap-1 font-bold text-primary">
-            {index === 0 && <Crown className="h-5 w-5 text-amber-400" />}
-            <span>{player.score} pts</span>
-          </div>
-        </li>
-      ))}
-    </ol>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-[50px]">Rank</TableHead>
+          <TableHead>Player</TableHead>
+          <TableHead className="text-right">Score</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedPlayers.map((player, index) => (
+          <TableRow key={player.id} className={index === 0 ? "bg-amber-500/10" : ""}>
+            <TableCell className="font-bold">
+              <div className="flex items-center gap-2">
+                {index === 0 && <Crown className="h-5 w-5 text-amber-400" />}
+                <span>{index + 1}</span>
+              </div>
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span className="font-semibold">{player.name}</span>
+              </div>
+            </TableCell>
+            <TableCell className="text-right font-mono font-bold text-primary">
+              {player.score} pts
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

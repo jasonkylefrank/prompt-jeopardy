@@ -4,12 +4,13 @@
 import type { Game, User } from "@/lib/types";
 import { LLMResponseViewer } from "./llm-response-viewer";
 import { AnswerSelector } from "./answer-selector";
-import { Leaderboard } from "./leaderboard";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { AppLogo } from "../icons";
 import { Loader2, Trophy } from "lucide-react";
 import ConfettiFX from "./confetti-fx";
 import { QuestionAsker } from "./question-asker";
+import { GameInfoPanel } from "./game-info-panel";
+import { PlayerGrid } from "./player-grid";
 
 type GameBoardProps = {
   game: Game;
@@ -17,7 +18,7 @@ type GameBoardProps = {
 };
 
 export function GameBoard({ game, currentUser }: GameBoardProps) {
-  const players = Object.values(game.players);
+  const players = Object.values(game.players).filter(p => !p.isHost);
   const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
   const mySubmission = currentRound?.submissions[currentUser.id];
   
@@ -52,15 +53,14 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
       <header className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <AppLogo className="h-10 w-10 text-primary" />
-          <h1 className="hidden font-headline text-3xl font-bold md:block">
+          <h1 className="font-headline text-3xl font-bold">
             Prompt Jeopardy
           </h1>
         </div>
-        <Card>
-          <CardContent className="p-3">
-             <Leaderboard players={players} horizontal compact />
-          </CardContent>
-        </Card>
+        <div className="text-right">
+            <p className="font-headline text-2xl font-bold">Round {game.currentRound}</p>
+            <p className="font-semibold capitalize text-primary">{game.status}</p>
+        </div>
       </header>
 
       <main className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -68,7 +68,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
           <Card className="min-h-[400px]">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">
-                Round {game.currentRound}
+                The Question
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -98,7 +98,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
           </Card>
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="space-y-8 lg:col-span-1">
           {game.status === "answering" && !mySubmission && currentRound && (
             <AnswerSelector 
               gameId={game.id} 
@@ -108,7 +108,7 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
             />
           )}
 
-          {game.status !== "answering" || (game.status === "answering" && mySubmission) ? (
+           {game.status !== "answering" || (game.status === "answering" && mySubmission) ? (
              <Card>
                 <CardHeader>
                   <CardTitle className="font-headline text-xl">Status</CardTitle>
@@ -145,6 +145,14 @@ export function GameBoard({ game, currentUser }: GameBoardProps) {
             </Card>
           )}
 
+        </div>
+
+        <div className="lg:col-span-3">
+            <PlayerGrid players={players} />
+        </div>
+
+         <div className="lg:col-span-3">
+            <GameInfoPanel game={game} />
         </div>
       </main>
     </div>

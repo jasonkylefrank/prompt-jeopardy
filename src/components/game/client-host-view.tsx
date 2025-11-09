@@ -26,7 +26,6 @@ import {
 import { PERSONAS, ACTIONS } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { Leaderboard } from "./leaderboard";
-import { ContestantCard } from "./contestant-card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import {
@@ -35,7 +34,6 @@ import {
   Users,
   Play,
   CheckCircle,
-  Trophy,
   ChevronRight,
   Eye,
   Settings,
@@ -45,6 +43,8 @@ import { AppLogo } from "../icons";
 import Link from "next/link";
 import type { User } from "@/lib/types";
 import { MultiSelect } from "../ui/multi-select";
+import { PlayerGrid } from "./player-grid";
+import { GameInfoPanel } from "./game-info-panel";
 
 export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const { game } = useGameState(initialGame);
@@ -154,52 +154,52 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   
   const isHost = user?.id === game.hostId;
 
-  const renderRoundSetup = (title: string) => {
-    return (
-      <div className="space-y-4 rounded-lg border p-4">
-        <h3 className="flex items-center gap-2 font-headline text-lg font-semibold"><Settings /> {title}</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-                <Label>Persona Pool (select up to 6)</Label>
-                <MultiSelect 
-                    options={PERSONAS} 
-                    selected={personaPool} 
-                    onChange={setPersonaPool} 
-                    placeholder="Select personas for the pool..."
-                    max={6}
-                />
-            </div>
-             <div className="space-y-2">
-                <Label>Correct Persona</Label>
-                <Select value={persona} onValueChange={setPersona} disabled={personaPool.length === 0}>
-                    <SelectTrigger><SelectValue placeholder="Select correct persona..." /></SelectTrigger>
-                    <SelectContent>{personaPool.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
+  const renderRoundSetup = (title: string) => (
+    <div className="space-y-4 rounded-lg border p-4">
+      <h3 className="flex items-center gap-2 font-headline text-lg font-semibold"><Settings /> {title}</h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Persona Pool (select up to 6)</Label>
+          <MultiSelect 
+            options={PERSONAS} 
+            selected={personaPool} 
+            onChange={setPersonaPool} 
+            placeholder="Select personas for the pool..."
+            max={6}
+          />
         </div>
-         <div className="space-y-4">
-            <div className="space-y-2">
-                <Label>Action Pool (select up to 5)</Label>
-                <MultiSelect 
-                    options={ACTIONS} 
-                    selected={actionPool} 
-                    onChange={setActionPool} 
-                    placeholder="Select actions for the pool..."
-                    max={5}
-                    className="w-full"
-                />
-            </div>
-             <div className="space-y-2">
-                <Label>Correct Action</Label>
-                <Select value={action} onValueChange={setAction} disabled={actionPool.length === 0}>
-                    <SelectTrigger><SelectValue placeholder="Select correct action..." /></SelectTrigger>
-                    <SelectContent>{actionPool.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
+        <div className="space-y-2">
+          <Label>Correct Persona</Label>
+          <Select value={persona} onValueChange={setPersona} disabled={personaPool.length === 0}>
+            <SelectTrigger><SelectValue placeholder="Select correct persona..." /></SelectTrigger>
+            <SelectContent>{personaPool.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
       </div>
-    );
-  };
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Action Pool (select up to 5)</Label>
+          <MultiSelect 
+            options={ACTIONS} 
+            selected={actionPool} 
+            onChange={setActionPool} 
+            placeholder="Select actions for the pool..."
+            max={5}
+            className="w-full"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Correct Action</Label>
+          <Select value={action} onValueChange={setAction} disabled={actionPool.length === 0}>
+            <SelectTrigger><SelectValue placeholder="Select correct action..." /></SelectTrigger>
+            <SelectContent>
+              {actionPool.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
 
   if (!user) {
     return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
@@ -260,7 +260,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Game Control</CardTitle>
               <CardDescription>
-                Current Status: <span className="font-semibold text-primary">{game.status.toUpperCase()}</span>
+                Current Status: <span className="font-semibold capitalize text-primary">{game.status}</span>
                 {game.status !== 'lobby' && ` | Round: ${game.currentRound}`}
               </CardDescription>
             </CardHeader>
@@ -321,22 +321,17 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                     See who has submitted their answers for Round {currentRound.roundNumber}.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                <CardContent className="flex flex-wrap gap-4">
                     {players.map(player => (
-                        <div key={player.id} className="flex flex-col items-center text-center">
-                            <ContestantCard player={player} />
+                        <div key={player.id} className="flex items-center gap-2 rounded-lg border p-2">
+                           <p className="font-semibold">{player.name}</p>
                             {currentRound.submissions[player.id] ? (
-                               <CheckCircle className="mt-2 h-6 w-6 text-green-500" />
+                               <CheckCircle className="h-5 w-5 text-green-500" />
                             ) : (
-                               <Loader2 className="mt-2 h-6 w-6 animate-spin text-muted-foreground" />
+                               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             )}
-                            <p className="text-sm text-muted-foreground">
-                                {currentRound.submissions[player.id] ? "Submitted" : "Awaiting"}
-                            </p>
                         </div>
                     ))}
-                  </div>
                 </CardContent>
              </Card>
           )}
@@ -344,31 +339,30 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         </div>
 
         <div className="space-y-8">
-          {/* Players */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-headline text-2xl">
                 <Users /> Contestants ({players.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              {players.map((player) => (
-                <ContestantCard key={player.id} player={player} />
-              ))}
+            <CardContent>
+              <PlayerGrid players={players} />
             </CardContent>
           </Card>
 
-          {/* Leaderboard */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-headline text-2xl">
-                <Trophy className="text-amber-400"/> Leaderboard
+              <CardTitle className="font-headline text-2xl">
+                Leaderboard
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Leaderboard players={players} />
             </CardContent>
           </Card>
+        </div>
+         <div className="lg:col-span-3">
+            <GameInfoPanel game={game} />
         </div>
       </div>
     </div>
