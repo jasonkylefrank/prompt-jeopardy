@@ -287,3 +287,22 @@ export async function advanceAfterScoring(gameId: string) {
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);
 }
+
+// This function is no longer used for live updates but might be useful for other things.
+export async function updateLiveQuestion(gameId: string, question: string) {
+  const game = await getGameState(gameId);
+  if (!game) return;
+
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  if (currentRound) {
+    // This part is tricky because phases are now an array.
+    // This function might need to be re-thought or deprecated.
+    // For now, let's assume we update the *last* phase if it exists, or do nothing.
+    const currentPhase = currentRound.phases[currentRound.phases.length - 1];
+    if (currentPhase && !currentPhase.llmResponse) { // only update if not answered
+        currentPhase.question = question;
+        await saveGame(game);
+        revalidatePath(`/game/${gameId}/host`);
+    }
+  }
+}
