@@ -38,7 +38,7 @@ import {
   ChevronRight,
   Eye,
   Settings,
-  FlagCheckered,
+  Flag,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
@@ -297,7 +297,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                         <span>Start Next Round</span>
                       </Button>
                       <Button onClick={handleFinishGame} variant="destructive" disabled={loading}>
-                        {loading ? <Loader2 className="animate-spin" /> : <FlagCheckered />}
+                        {loading ? <Loader2 className="animate-spin" /> : <Flag />}
                         <span>End Game</span>
                       </Button>
                     </div>
@@ -368,3 +368,5 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     </div>
   );
 }
+
+    
