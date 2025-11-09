@@ -60,10 +60,10 @@ export default function Home() {
       setLoading(true);
       try {
         // Explicitly set isHost for the host player
-        const hostPlayer = { ...user, score: 0, isHost: true };
+        const hostPlayer = { ...user, isHost: true };
         const newGameId = await createGame(hostPlayer);
         // The host's info is also stored to identify them on the host page
-        sessionStorage.setItem("player", JSON.stringify(hostPlayer));
+        sessionStorage.setItem("player", JSON.stringify({...hostPlayer, score: 0}));
         router.push(`/game/${newGameId}/host`);
       } catch (err) {
         console.error("Failed to create game:", err);
@@ -75,14 +75,14 @@ export default function Home() {
     if (dialogAction === "join") {
       setJoinLoading(true);
       try {
-        const contestantPlayer = { ...user, score: 0, isHost: false };
+        const contestantPlayer = { ...user, isHost: false };
         const result = await joinGame(gameId.toUpperCase(), contestantPlayer);
 
         if (!result.success) {
           setJoinError(result.message);
         } else {
           // Store contestant info for the session
-          sessionStorage.setItem("player", JSON.stringify(contestantPlayer));
+          sessionStorage.setItem("player", JSON.stringify({...contestantPlayer, score: 0}));
           router.push(`/game/${gameId.toUpperCase()}`);
         }
       } catch (err) {
