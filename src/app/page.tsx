@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -52,7 +51,7 @@ export default function Home() {
 
   const handleNameSubmit = async (name: string) => {
     // The user's ID is a simple random string for session identification
-    const user: Omit<Player, "score"> = {
+    const user: Omit<Player, "score" > = {
       id: Math.random().toString(36).substring(2, 9),
       name,
     };
@@ -60,9 +59,11 @@ export default function Home() {
     if (dialogAction === "create") {
       setLoading(true);
       try {
-        const newGameId = await createGame(user);
+        // Explicitly set isHost for the host player
+        const hostPlayer = { ...user, score: 0, isHost: true };
+        const newGameId = await createGame(hostPlayer);
         // The host's info is also stored to identify them on the host page
-        sessionStorage.setItem("player", JSON.stringify(user));
+        sessionStorage.setItem("player", JSON.stringify(hostPlayer));
         router.push(`/game/${newGameId}/host`);
       } catch (err) {
         console.error("Failed to create game:", err);
@@ -74,13 +75,14 @@ export default function Home() {
     if (dialogAction === "join") {
       setJoinLoading(true);
       try {
-        const result = await joinGame(gameId.toUpperCase(), user);
+        const contestantPlayer = { ...user, score: 0, isHost: false };
+        const result = await joinGame(gameId.toUpperCase(), contestantPlayer);
 
         if (!result.success) {
           setJoinError(result.message);
         } else {
           // Store contestant info for the session
-          sessionStorage.setItem("player", JSON.stringify(user));
+          sessionStorage.setItem("player", JSON.stringify(contestantPlayer));
           router.push(`/game/${gameId.toUpperCase()}`);
         }
       } catch (err) {

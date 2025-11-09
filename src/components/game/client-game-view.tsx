@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,7 +15,7 @@ type ClientGameViewProps = {
 };
 
 export function ClientGameView({ initialGame }: ClientGameViewProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRejoinDialogOpen, setIsRejoinDialogOpen] = useState(false);
   const [rejoinLoading, setRejoinLoading] = useState(false);
@@ -26,12 +25,18 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
     // Check if player info is in session storage
     const storedPlayer = sessionStorage.getItem("player");
     if (storedPlayer) {
-      const playerData = JSON.parse(storedPlayer);
-      // Verify this player is actually in the game state
-      if (game.players[playerData.id] || game.hostId === playerData.id) {
-        setUser(playerData);
-      } else {
-        // Stale player data, prompt to join
+      try {
+        const playerData: Player = JSON.parse(storedPlayer);
+        // Verify this player is actually in the game state
+        if (game.players[playerData.id] || game.hostId === playerData.id) {
+          setUser(playerData);
+        } else {
+          // Stale player data, prompt to join
+          setIsRejoinDialogOpen(true);
+        }
+      } catch (error) {
+        console.error("Error parsing player data from session storage", error);
+        sessionStorage.removeItem("player");
         setIsRejoinDialogOpen(true);
       }
     } else {
@@ -48,10 +53,15 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
             id: Math.random().toString(36).substring(2, 9),
             name,
         };
-        await joinGame(game.id, player);
-        sessionStorage.setItem("player", JSON.stringify(player));
-        setUser(player);
-        setIsRejoinDialogOpen(false);
+        const newPlayer = { ...player, score: 0, isHost: false };
+        const result = await joinGame(game.id, newPlayer);
+        if (result.success) {
+            sessionStorage.setItem("player", JSON.stringify(newPlayer));
+            setUser(newPlayer);
+            setIsRejoinDialogOpen(false);
+        } else {
+            console.error("Failed to rejoin game:", result.message);
+        }
     } finally {
         setRejoinLoading(false);
     }
@@ -75,8 +85,11 @@ export function ClientGameView({ initialGame }: ClientGameViewProps) {
       <>
         <NameDialog
           isOpen={isRejoinDialogOpen}
-          // Prevent closing the dialog by clicking outside
-          onOpenChange={(open) => !open && handleRejoin ? null : setIsRejoinDialogOpen(open)}
+          onOpenChange={(open) => {
+            // Prevent closing the dialog by clicking outside or pressing Escape
+            if (!open) return;
+            setIsRejoinDialogOpen(open);
+          }}
           onNameSubmit={handleRejoin}
           loading={rejoinLoading}
         />
