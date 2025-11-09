@@ -85,7 +85,8 @@ export default function Home() {
           sessionStorage.setItem("player", JSON.stringify({...contestantPlayer, score: 0}));
           router.push(`/game/${gameId.toUpperCase()}`);
         }
-      } catch (err) {
+      } catch (err)
+ {
         console.error("Failed to join game:", err);
         setJoinError("Failed to join game. Please check the ID and try again.");
       } finally {
