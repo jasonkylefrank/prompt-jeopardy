@@ -48,8 +48,11 @@ export async function joinGame(
   }
   
   if (!game.players[playerData.id]) {
-    game.players[playerData.id] = { ...playerData, score: 0, isHost: false };
-    await saveGame(game);
+    const newPlayer = { ...playerData, score: 0, isHost: false };
+    const gameDocRef = doc(firestore, 'games', gameId);
+    await updateDoc(gameDocRef, {
+        [`players.${playerData.id}`]: newPlayer
+    });
   }
 
   revalidatePath(`/game/${gameId}`);
@@ -128,32 +131,38 @@ export async function finishGame(gameId: string) {
 
 // --- PHASE ACTIONS ---
 
-export async function submitQuestion(gameId: string, questionText: string) {
-  const game = await getGameState(gameId);
-  if (!game || !game.currentAskerId) return;
-
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
-  if (!currentRound) return;
-
-  game.status = 'responding';
+export async function submitQuestion(gameId: string, questionText: string, askerId: string) {
+    const game = await getGameState(gameId);
+    if (!game) return;
   
-  const newPhase: Phase = {
-    phaseNumber: game.currentPhaseNumber,
-    questionAskerId: game.currentAskerId,
-    question: questionText,
-    llmResponse: '',
-    submissions: {},
-    isScored: false,
-  };
-
-  currentRound.phases.push(newPhase);
-
-  await saveGame(game);
-  revalidatePath(`/game/${gameId}`);
-  revalidatePath(`/game/${gameId}/host`);
-
-  // Start LLM generation in the background
-  generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
+    // Check if it's the right person's turn
+    if (game.currentAskerId !== askerId || game.status !== 'asking') {
+      console.warn(`Unauthorized or out-of-order question submission by ${askerId}`);
+      return;
+    }
+  
+    const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+    if (!currentRound) return;
+  
+    game.status = 'responding';
+    
+    const newPhase: Phase = {
+      phaseNumber: game.currentPhaseNumber,
+      questionAskerId: askerId,
+      question: questionText,
+      llmResponse: '',
+      submissions: {},
+      isScored: false,
+    };
+  
+    currentRound.phases.push(newPhase);
+  
+    await saveGame(game);
+    revalidatePath(`/game/${gameId}`);
+    revalidatePath(`/game/${gameId}/host`);
+  
+    // Start LLM generation in the background
+    generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
 }
 
 async function generateAndSaveLLMResponse(
@@ -195,8 +204,12 @@ export async function submitAnswer(
   const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
   
   if (currentPhase && !currentPhase.submissions[playerId]) {
-    currentPhase.submissions[playerId] = submission;
-    await saveGame(game);
+    // Use Firestore's dot notation to update a nested object field
+    const gameDocRef = doc(firestore, 'games', game.id);
+    await updateDoc(gameDocRef, {
+      [`rounds.${game.currentRoundNumber - 1}.phases.${game.currentPhaseNumber - 1}.submissions.${playerId}`]: submission
+    });
+
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/host`);
   }
@@ -233,24 +246,8 @@ export async function scorePhase(gameId: string) {
   });
 
   currentPhase.isScored = true;
-  
-  if (someoneGuessedCorrectly) {
-    game.status = 'round-finished';
-  } else {
-    // No one got it right, move to the next phase within the same round
-    game.status = 'asking';
-    game.currentPhaseNumber += 1;
-    
-    // Determine the next asker
-    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
-    if (playerIds.length > 0) {
-      const currentAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
-      const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
-      game.currentAskerId = playerIds[nextAskerIndex];
-    }
-  }
-
   game.status = 'scoring'; // Go to scoring screen first
+  
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);

@@ -63,10 +63,9 @@ export default function Home() {
         const newGameId = await createGame(user);
         // The host's info is also stored to identify them on the host page
         sessionStorage.setItem("player", JSON.stringify(user));
-        router.refresh();
-        // Redirect to the new host page
         router.push(`/game/${newGameId}/host`);
       } catch (err) {
+        console.error("Failed to create game:", err);
         setCreateError("Failed to create game. Please try again.");
         setLoading(false);
       }
@@ -79,16 +78,15 @@ export default function Home() {
 
         if (!result.success) {
           setJoinError(result.message);
-          setJoinLoading(false);
         } else {
           // Store contestant info for the session
           sessionStorage.setItem("player", JSON.stringify(user));
-          // Refresh the page to ensure sessionStorage is updated before navigation
-          router.refresh();
           router.push(`/game/${gameId.toUpperCase()}`);
         }
       } catch (err) {
+        console.error("Failed to join game:", err);
         setJoinError("Failed to join game. Please check the ID and try again.");
+      } finally {
         setJoinLoading(false);
       }
     }
@@ -159,7 +157,7 @@ export default function Home() {
                 <CardDescription>
                   Enter the game ID from your host to join the fun.
                 </CardDescription>
-              </CardHeader>
+              </Header>
               <CardContent className="flex-grow space-y-4">
                 <Label htmlFor="game-id">Game ID</Label>
                 <Input

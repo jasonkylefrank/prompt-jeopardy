@@ -1,35 +1,32 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { updateLiveQuestion, submitQuestion } from "@/app/actions";
+import { useState } from "react";
+import { submitQuestion } from "@/app/actions";
 import { Textarea } from "../ui/textarea";
-import { useDebounce } from "@/hooks/use-debounce";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Loader2, PenSquare, Send } from "lucide-react";
 import { Button } from "../ui/button";
 
 type QuestionAskerProps = {
     gameId: string;
+    askerId: string;
 };
 
-export function QuestionAsker({ gameId }: QuestionAskerProps) {
+export function QuestionAsker({ gameId, askerId }: QuestionAskerProps) {
     const [question, setQuestion] = useState('');
     const [loading, setLoading] = useState(false);
-    const debouncedQuestion = useDebounce(question, 300); // 300ms debounce delay
-
-    useEffect(() => {
-        // This effect runs when the debouncedQuestion changes
-        // It prevents sending too many requests while the user is typing
-        if (debouncedQuestion) {
-            updateLiveQuestion(gameId, debouncedQuestion);
-        }
-    }, [debouncedQuestion, gameId]);
 
     const handleSubmit = async () => {
+        if (question.trim().length < 5) return;
         setLoading(true);
-        await submitQuestion(gameId);
-        // The parent will re-render due to game state change, no need to setLoading(false) here
+        try {
+            await submitQuestion(gameId, question, askerId);
+        } catch (error) {
+            console.error("Failed to submit question:", error);
+            setLoading(false); // Only reset loading on error
+        }
+        // The parent will re-render due to game state change, no need to setLoading(false) here on success
     }
 
     return (
