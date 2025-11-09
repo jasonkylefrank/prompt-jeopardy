@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Game } from "@/lib/types";
+import type { Round } from "@/lib/types";
 import {
   Card,
   CardContent,
@@ -12,10 +12,9 @@ import {
 import { Badge } from "../ui/badge";
 import { List, Info, CircleDollarSign } from "lucide-react";
 
-export function GameInfoPanel({ game }: { game: Game }) {
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
-  const personaPool = currentRound?.personaPool || game.liveQuestion.personaPool || [];
-  const actionPool = currentRound?.actionPool || game.liveQuestion.actionPool || [];
+export function GameInfoPanel({ round }: { round: Round }) {
+  const personaPool = round.personaPool || [];
+  const actionPool = round.actionPool || [];
 
   return (
     <Card>

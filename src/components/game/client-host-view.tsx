@@ -2,9 +2,10 @@
 "use client";
 
 import {
-  advanceGameState,
-  scoreRound,
-  setRoundData,
+  advanceToNextRound,
+  scorePhase,
+  finishGame,
+  advanceAfterScoring
 } from "@/app/actions";
 import type { Game } from "@/lib/types";
 import { useGameState } from "@/hooks/use-game-state";
@@ -37,6 +38,7 @@ import {
   ChevronRight,
   Eye,
   Settings,
+  FlagCheckered,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppLogo } from "../icons";
@@ -52,14 +54,11 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const [persona, setPersona] = useState(game.liveQuestion.persona || "");
-  const [action, setAction] = useState(game.liveQuestion.action || "");
-  const [personaPool, setPersonaPool] = useState<string[]>(
-    game.liveQuestion.personaPool || []
-  );
-  const [actionPool, setActionPool] = useState<string[]>(
-    game.liveQuestion.actionPool?.length ? game.liveQuestion.actionPool : ACTIONS
-  );
+  // State for setting up the NEXT round
+  const [nextPersona, setNextPersona] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [nextPersonaPool, setNextPersonaPool] = useState<string[]>([]);
+  const [nextActionPool, setNextActionPool] = useState<string[]>(ACTIONS);
 
 
   useEffect(() => {
@@ -69,65 +68,37 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     }
   }, []);
 
-  const handleAdvanceState = async (nextState: Game["status"]) => {
+  const handleStartFirstRound = async () => {
     setLoading(true);
-    // For starting the game, pass the selected persona and action
-    if (nextState === 'asking' && game.status === 'lobby') {
-        if (!persona || !action || personaPool.length < 2 || actionPool.length < 2) {
-            toast({
-                variant: 'destructive',
-                title: 'Setup Incomplete',
-                description: 'Please select pools (min 2 each) and a correct persona/action for the first round.'
-            })
-            setLoading(false);
-            return;
-        }
-        await advanceGameState(game.id, nextState, { persona, action, personaPool, actionPool });
-    } else {
-        await advanceGameState(game.id, nextState);
+    if (!nextPersona || !nextAction || nextPersonaPool.length < 2 || nextActionPool.length < 2) {
+        toast({
+            variant: 'destructive',
+            title: 'Setup Incomplete',
+            description: 'Please select pools (min 2 each) and a correct persona/action for the first round.'
+        })
+        setLoading(false);
+        return;
     }
+    await advanceToNextRound(game.id, { persona: nextPersona, action: nextAction, personaPool: nextPersonaPool, actionPool: nextActionPool });
+    resetRoundSetup();
     setLoading(false);
   };
   
-  // Debounced update for round data
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (game.status === 'lobby' || game.status === 'scoring') {
-        setRoundData(game.id, { persona, action, personaPool, actionPool });
-      }
-    }, 500);
-    return () => clearTimeout(handler);
-  }, [persona, action, personaPool, actionPool, game.id, game.status]);
-
-
-  // Clear persona/action if they are no longer in the pool
-  useEffect(() => {
-    if (persona && !personaPool.includes(persona)) {
-      setPersona('');
-    }
-  }, [personaPool, persona]);
-
-  useEffect(() => {
-    if (action && !actionPool.includes(action)) {
-      setAction('');
-    }
-  }, [actionPool, action]);
-
-
-  const handleScoreRound = async () => {
+  const handleScorePhase = async () => {
     setLoading(true);
-    await scoreRound(game.id);
-    // Reset for next round setup
-    setPersona('');
-    setAction('');
-    setPersonaPool([]);
-    setActionPool(ACTIONS); // Pre-select all actions for the next round
+    await scorePhase(game.id);
     setLoading(false);
   };
-  
-  const handleNextRound = async () => {
+
+  const handleAdvanceAfterScoring = async () => {
     setLoading(true);
-    if (!persona || !action || personaPool.length < 2 || actionPool.length < 2) {
+    await advanceAfterScoring(game.id);
+    setLoading(false);
+  }
+  
+  const handleStartNextRound = async () => {
+    setLoading(true);
+    if (!nextPersona || !nextAction || nextPersonaPool.length < 2 || nextActionPool.length < 2) {
         toast({
             variant: 'destructive',
             title: 'Setup Incomplete',
@@ -136,12 +107,27 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         setLoading(false);
         return;
     }
-    await advanceGameState(game.id, 'asking', { persona, action, personaPool, actionPool });
+    await advanceToNextRound(game.id, { persona: nextPersona, action: nextAction, personaPool: nextPersonaPool, actionPool: nextActionPool });
+    resetRoundSetup();
     setLoading(false);
   }
 
+  const handleFinishGame = async () => {
+    setLoading(true);
+    await finishGame(game.id);
+    setLoading(false);
+  }
+
+  const resetRoundSetup = () => {
+    setNextPersona('');
+    setNextAction('');
+    setNextPersonaPool([]);
+    setNextActionPool(ACTIONS);
+  }
+
   const players = Object.values(game.players).filter(p => !p.isHost);
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
 
   const copyGameLink = () => {
     const url = `${window.location.origin}/game/${game.id}`;
@@ -162,17 +148,17 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
           <Label>Persona Pool (select up to 6)</Label>
           <MultiSelect 
             options={PERSONAS} 
-            selected={personaPool} 
-            onChange={setPersonaPool} 
+            selected={nextPersonaPool} 
+            onChange={setNextPersonaPool} 
             placeholder="Select personas for the pool..."
             max={6}
           />
         </div>
         <div className="space-y-2">
           <Label>Correct Persona</Label>
-          <Select value={persona} onValueChange={setPersona} disabled={personaPool.length === 0}>
+          <Select value={nextPersona} onValueChange={setNextPersona} disabled={nextPersonaPool.length === 0}>
             <SelectTrigger><SelectValue placeholder="Select correct persona..." /></SelectTrigger>
-            <SelectContent>{personaPool.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+            <SelectContent>{nextPersonaPool.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       </div>
@@ -181,8 +167,8 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
           <Label>Action Pool (select up to 5)</Label>
           <MultiSelect 
             options={ACTIONS} 
-            selected={actionPool} 
-            onChange={setActionPool} 
+            selected={nextActionPool} 
+            onChange={setNextActionPool} 
             placeholder="Select actions for the pool..."
             max={5}
             className="w-full"
@@ -190,10 +176,10 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         </div>
         <div className="space-y-2">
           <Label>Correct Action</Label>
-          <Select value={action} onValueChange={setAction} disabled={actionPool.length === 0}>
+          <Select value={nextAction} onValueChange={setNextAction} disabled={nextActionPool.length === 0}>
             <SelectTrigger><SelectValue placeholder="Select correct action..." /></SelectTrigger>
             <SelectContent>
-              {actionPool.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              {nextActionPool.map(a => <SelectItem key={a} value={a} className="whitespace-normal">{a}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -260,15 +246,15 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Game Control</CardTitle>
               <CardDescription>
-                Current Status: <span className="font-semibold capitalize text-primary">{game.status}</span>
-                {game.status !== 'lobby' && ` | Round: ${game.currentRound}`}
+                Current Status: <span className="font-semibold capitalize text-primary">{game.status.replace('-', ' ')}</span>
+                {game.status !== 'lobby' && ` | Round: ${game.currentRoundNumber} | Phase: ${game.currentPhaseNumber}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {game.status === "lobby" && (
                 <>
                   {renderRoundSetup("Setup First Round")}
-                  <Button onClick={() => handleAdvanceState("asking")} disabled={loading || players.length < 1 || !persona || !action || personaPool.length < 2 || actionPool.length < 2}>
+                  <Button onClick={handleStartFirstRound} disabled={loading || players.length < 1}>
                     {loading ? <Loader2 className="animate-spin" /> : <Play />}
                     <span>Start Game</span>
                   </Button>
@@ -281,11 +267,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                       Waiting for question from: <span className="font-bold">{game.players[game.currentAskerId || '']?.name || '...'}</span>
                     </h3>
                      <p className="text-muted-foreground">Live question:</p>
-                    <p className="text-lg font-semibold italic">"{game.liveQuestion.text || '...'}"</p>
-                    
-                    <p className="text-sm text-muted-foreground">
-                        Round Persona: <span className="font-semibold">{game.liveQuestion.persona}</span> | Action: <span className="font-semibold">{game.liveQuestion.action}</span>
-                    </p>
+                    <p className="text-lg font-semibold italic">"{currentPhase?.question || '...'}"</p>
                  </div>
               )}
               {game.status === 'responding' && (
@@ -295,37 +277,55 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
                 </div>
               )}
               {game.status === "answering" && (
-                 <Button onClick={handleScoreRound} disabled={loading}>
+                 <Button onClick={handleScorePhase} disabled={loading}>
                  {loading ? <Loader2 className="animate-spin" /> : <CheckCircle />}
-                 <span>End Answering & Score Round</span>
+                 <span>End Answering & Score Phase</span>
                </Button>
               )}
               {game.status === "scoring" && (
+                 <Button onClick={handleAdvanceAfterScoring} disabled={loading}>
+                   {loading ? <Loader2 className="animate-spin" /> : <ChevronRight />}
+                   <span>Continue</span>
+                 </Button>
+              )}
+              {game.status === "round-finished" && (
                  <div>
-                    {renderRoundSetup(`Setup Round ${game.currentRound + 1}`)}
-                    <Button onClick={handleNextRound} className="mt-4" disabled={loading}>
-                      {loading ? <Loader2 className="animate-spin" /> : <ChevronRight />}
-                      <span>Start Next Round</span>
-                    </Button>
+                    {renderRoundSetup(`Setup Round ${game.currentRoundNumber + 1}`)}
+                    <div className="mt-4 flex gap-4">
+                      <Button onClick={handleStartNextRound} disabled={loading}>
+                        {loading ? <Loader2 className="animate-spin" /> : <ChevronRight />}
+                        <span>Start Next Round</span>
+                      </Button>
+                      <Button onClick={handleFinishGame} variant="destructive" disabled={loading}>
+                        {loading ? <Loader2 className="animate-spin" /> : <FlagCheckered />}
+                        <span>End Game</span>
+                      </Button>
+                    </div>
                  </div>
+              )}
+               {game.status === "game-finished" && (
+                <div className="text-center">
+                    <h3 className="font-headline text-2xl">Game Over!</h3>
+                    <p className="text-muted-foreground">Thanks for playing.</p>
+                </div>
               )}
             </CardContent>
           </Card>
           
           {/* Submissions */}
-          {currentRound && (game.status === 'answering' || game.status === 'scoring' || game.status === 'finished') && (
+          {currentPhase && (game.status === 'answering' || game.status === 'scoring') && (
              <Card>
                 <CardHeader>
                   <CardTitle className="font-headline text-2xl">Submissions</CardTitle>
                   <CardDescription>
-                    See who has submitted their answers for Round {currentRound.roundNumber}.
+                    See who has submitted their answers for Phase {currentPhase.phaseNumber}.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-4">
                     {players.map(player => (
                         <div key={player.id} className="flex items-center gap-2 rounded-lg border p-2">
                            <p className="font-semibold">{player.name}</p>
-                            {currentRound.submissions[player.id] ? (
+                            {currentPhase.submissions[player.id] ? (
                                <CheckCircle className="h-5 w-5 text-green-500" />
                             ) : (
                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -362,7 +362,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
           </Card>
         </div>
          <div className="lg:col-span-3">
-            <GameInfoPanel game={game} />
+            {currentRound && <GameInfoPanel round={currentRound} />}
         </div>
       </div>
     </div>

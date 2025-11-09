@@ -2,7 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { Game, Player, Submission } from '@/lib/types';
+import type { Game, Player, Submission, Round, Phase } from '@/lib/types';
 import { generateLLMResponse as generateLLMResponseFlow } from '@/ai/flows/generate-llm-response';
 import { doc, setDoc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { firestore } from '@/firebase/server';
@@ -23,17 +23,11 @@ export async function createGame(hostData: Omit<Player, 'score' | 'isHost'>): Pr
     hostId: host.id,
     hostName: host.name,
     status: 'lobby',
-    players: {},
+    players: { [host.id]: host },
     rounds: [],
-    currentRound: 0,
+    currentRoundNumber: 0,
+    currentPhaseNumber: 0,
     currentAskerId: null,
-    liveQuestion: { 
-      text: '',
-      persona: '',
-      action: '',
-      personaPool: [],
-      actionPool: [],
-    },
   };
 
   await saveGame(newGame);
@@ -84,126 +78,82 @@ export async function getAllGames(): Promise<Game[]> {
     return games;
 }
 
-export async function advanceGameState(
+export async function advanceToNextRound(
   gameId: string,
-  newStatus: Game['status'],
-  options?: { persona?: string, action?: string, personaPool?: string[], actionPool?: string[] }
+  options: { persona: string, action: string, personaPool: string[], actionPool: string[] }
 ) {
   const game = await getGameState(gameId);
   if (!game) return;
 
-  game.status = newStatus;
+  game.status = 'asking';
+  game.currentRoundNumber += 1;
+  game.currentPhaseNumber = 1;
 
-  // Logic for advancing from lobby to asking
-  if (newStatus === 'asking' && game.currentRound === 0) {
-    game.currentRound = 1;
-    if(options?.persona && options?.action && options?.personaPool && options?.actionPool) {
-        game.liveQuestion.persona = options.persona;
-        game.liveQuestion.action = options.action;
-        game.liveQuestion.personaPool = options.personaPool;
-        game.liveQuestion.actionPool = options.actionPool;
-    }
+  const newRound: Round = {
+    roundNumber: game.currentRoundNumber,
+    correctAnswer: {
+      persona: options.persona,
+      action: options.action,
+    },
+    personaPool: options.personaPool,
+    actionPool: options.actionPool,
+    phases: [],
+  };
+  game.rounds.push(newRound);
 
-    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
-    if (playerIds.length > 0) {
-      game.currentAskerId = playerIds[0];
-    }
-  } 
-  // Logic for advancing to a new round (from scoring to asking)
-  else if (newStatus === 'asking' && game.status !== 'lobby') {
-    game.currentRound += 1;
-     if(options?.persona && options?.action && options?.personaPool && options?.actionPool) {
-        game.liveQuestion.persona = options.persona;
-        game.liveQuestion.action = options.action;
-        game.liveQuestion.personaPool = options.personaPool;
-        game.liveQuestion.actionPool = options.actionPool;
-    }
-    
-    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
-    
-    if (playerIds.length > 0) {
-      // Determine the next asker
-      const currentAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
-      const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
-      game.currentAskerId = playerIds[nextAskerIndex];
-    } else {
-      // No non-host players, maybe reset or handle this case
-      game.currentAskerId = null;
-    }
-    // Reset live question text for the new round
-    game.liveQuestion.text = '';
+  // Set first asker for the new round
+  const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
+  if (playerIds.length > 0) {
+    const lastAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
+    const nextAskerIndex = (lastAskerIndex + 1) % playerIds.length;
+    game.currentAskerId = playerIds[nextAskerIndex];
   }
-
-
-  if (newStatus === 'finished') {
-    // any cleanup for game end
-  }
-
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);
   revalidatePath(`/history/${gameId}`);
-  revalidatePath(`/history`);
 }
 
-// --- LIVE QUESTION ACTIONS ---
-export async function updateLiveQuestion(gameId: string, questionText: string) {
-    const gameDocRef = doc(firestore, 'games', gameId);
-    await updateDoc(gameDocRef, { 'liveQuestion.text': questionText });
+export async function finishGame(gameId: string) {
+    const game = await getGameState(gameId);
+    if (!game) return;
+    game.status = 'game-finished';
+    await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/host`);
-}
-
-export async function setRoundData(gameId: string, data: { persona?: string, action?: string, personaPool?: string[], actionPool?: string[]}) {
-    const gameDocRef = doc(firestore, 'games', gameId);
-    const updateData: Record<string, any> = {};
-    if (data.persona !== undefined) updateData['liveQuestion.persona'] = data.persona;
-    if (data.action !== undefined) updateData['liveQuestion.action'] = data.action;
-    if (data.personaPool !== undefined) updateData['liveQuestion.personaPool'] = data.personaPool;
-    if (data.actionPool !== undefined) updateData['liveQuestion.actionPool'] = data.actionPool;
-
-    await updateDoc(gameDocRef, updateData);
-    revalidatePath(`/game/${gameId}/host`);
+    revalidatePath(`/history/${gameId}`);
 }
 
 
-// --- ROUND ACTIONS ---
+// --- PHASE ACTIONS ---
 
-export async function submitQuestion(gameId: string) {
+export async function submitQuestion(gameId: string, questionText: string) {
   const game = await getGameState(gameId);
-  if (!game || !game.liveQuestion.text || !game.liveQuestion.persona || !game.liveQuestion.action || !game.currentAskerId || !game.liveQuestion.personaPool || !game.liveQuestion.actionPool) return;
+  if (!game || !game.currentAskerId) return;
+
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  if (!currentRound) return;
 
   game.status = 'responding';
-  const newRound = {
-    roundNumber: game.currentRound, 
+  
+  const newPhase: Phase = {
+    phaseNumber: game.currentPhaseNumber,
     questionAskerId: game.currentAskerId,
-    question: game.liveQuestion.text,
+    question: questionText,
     llmResponse: '',
     submissions: {},
     isScored: false,
-    correctAnswer: { 
-      persona: game.liveQuestion.persona,
-      action: game.liveQuestion.action,
-    },
-    personaPool: game.liveQuestion.personaPool,
-    actionPool: game.liveQuestion.actionPool,
   };
 
-  // If it's a new round, push it. Otherwise, update the existing one if needed.
-  const existingRoundIndex = game.rounds.findIndex(r => r.roundNumber === game.currentRound);
-  if (existingRoundIndex > -1) {
-    game.rounds[existingRoundIndex] = newRound;
-  } else {
-    game.rounds.push(newRound);
-  }
+  currentRound.phases.push(newPhase);
 
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);
-  revalidatePath(`/history/${gameId}`);
 
-  generateAndSaveLLMResponse(gameId, game.liveQuestion.text, game.liveQuestion.persona, game.liveQuestion.action);
+  // Start LLM generation in the background
+  generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
 }
 
 async function generateAndSaveLLMResponse(
@@ -221,14 +171,15 @@ async function generateAndSaveLLMResponse(
   const game = await getGameState(gameId);
   if (!game) return;
 
-  const currentRoundIndex = game.rounds.findIndex(r => r.roundNumber === game.currentRound);
-  if (currentRoundIndex > -1) {
-    game.rounds[currentRoundIndex].llmResponse = llmResult.response;
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
+
+  if (currentPhase) {
+    currentPhase.llmResponse = llmResult.response;
     game.status = 'answering';
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/host`);
-    revalidatePath(`/history/${gameId}`);
   }
 }
 
@@ -240,47 +191,99 @@ export async function submitAnswer(
   const game = await getGameState(gameId);
   if (!game || game.status !== 'answering') return;
 
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
-  if (currentRound && !currentRound.submissions[playerId]) {
-    currentRound.submissions[playerId] = submission;
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
+  
+  if (currentPhase && !currentPhase.submissions[playerId]) {
+    currentPhase.submissions[playerId] = submission;
     await saveGame(game);
     revalidatePath(`/game/${gameId}`);
     revalidatePath(`/game/${gameId}/host`);
-    revalidatePath(`/history/${gameId}`);
   }
 }
 
-export async function scoreRound(gameId: string) {
+export async function scorePhase(gameId: string) {
   const game = await getGameState(gameId);
   if (!game) return;
 
-  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRound);
-  if (!currentRound || currentRound.isScored) return;
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  const currentPhase = currentRound?.phases.find(p => p.phaseNumber === game.currentPhaseNumber);
+  
+  if (!currentRound || !currentPhase || currentPhase.isScored) return;
 
-  const { persona: correctPersona, action: correctAction } =
-    currentRound.correctAnswer;
+  const { persona: correctPersona, action: correctAction } = currentRound.correctAnswer;
 
-  Object.entries(currentRound.submissions).forEach(([playerId, submission]) => {
-    // Only score non-host players
+  let someoneGuessedCorrectly = false;
+
+  Object.entries(currentPhase.submissions).forEach(([playerId, submission]) => {
     if (game.players[playerId] && !game.players[playerId].isHost) {
-        const isPersonaCorrect = submission.persona === correctPersona;
-        const isActionCorrect = submission.action === correctAction;
-        let points = 0;
-        if (isPersonaCorrect && isActionCorrect) {
-        points = 100; 
-        } else if (isPersonaCorrect || isActionCorrect) {
-        points = 25; 
-        } else {
-        points = -10; 
-        }
-        game.players[playerId].score += points;
+      const isPersonaCorrect = submission.persona === correctPersona;
+      const isActionCorrect = submission.action === correctAction;
+      let points = 0;
+      if (isPersonaCorrect && isActionCorrect) {
+        points = 100;
+        someoneGuessedCorrectly = true;
+      } else if (isPersonaCorrect || isActionCorrect) {
+        points = 25;
+      } else {
+        points = -10;
+      }
+      game.players[playerId].score += points;
     }
   });
 
-  currentRound.isScored = true;
-  game.status = 'scoring';
+  currentPhase.isScored = true;
+  
+  if (someoneGuessedCorrectly) {
+    game.status = 'round-finished';
+  } else {
+    // No one got it right, move to the next phase within the same round
+    game.status = 'asking';
+    game.currentPhaseNumber += 1;
+    
+    // Determine the next asker
+    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
+    if (playerIds.length > 0) {
+      const currentAskerIndex = game.currentAskerId ? playerIds.indexOf(game.currentAskerId) : -1;
+      const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
+      game.currentAskerId = playerIds[nextAskerIndex];
+    }
+  }
+
+  game.status = 'scoring'; // Go to scoring screen first
   await saveGame(game);
   revalidatePath(`/game/${gameId}`);
   revalidatePath(`/game/${gameId}/host`);
-  revalidatePath(`/history/${gameId}`);
+}
+
+
+export async function advanceAfterScoring(gameId: string) {
+  const game = await getGameState(gameId);
+  if (!game || game.status !== 'scoring') return;
+
+  const currentRound = game.rounds.find(r => r.roundNumber === game.currentRoundNumber);
+  if (!currentRound) return;
+  
+  const correctGuessMade = Object.values(currentRound.phases).some(phase => 
+    Object.values(phase.submissions).some(sub => 
+      sub.persona === currentRound.correctAnswer.persona && sub.action === currentRound.correctAnswer.action
+    )
+  );
+
+  if (correctGuessMade) {
+    game.status = 'round-finished';
+  } else {
+    game.status = 'asking';
+    game.currentPhaseNumber += 1;
+    const playerIds = Object.keys(game.players).filter(id => !game.players[id].isHost);
+    if (playerIds.length > 0 && game.currentAskerId) {
+      const currentAskerIndex = playerIds.indexOf(game.currentAskerId);
+      const nextAskerIndex = (currentAskerIndex + 1) % playerIds.length;
+      game.currentAskerId = playerIds[nextAskerIndex];
+    }
+  }
+
+  await saveGame(game);
+  revalidatePath(`/game/${gameId}`);
+  revalidatePath(`/game/${gameId}/host`);
 }
