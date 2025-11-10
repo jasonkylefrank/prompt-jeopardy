@@ -66,8 +66,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
     if (storedPlayer) {
       setUser(JSON.parse(storedPlayer));
     }
-    // Pre-fill pools with all options for convenience
-    setNextPersonaPool(PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options)));
+    // Pre-fill action pool, but leave persona pool empty by default.
     setNextActionPool(ACTIONS);
   }, []);
 
@@ -124,7 +123,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
   const resetRoundSetup = () => {
     setNextPersona('');
     setNextAction('');
-    setNextPersonaPool(PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options)));
+    setNextPersonaPool([]);
     setNextActionPool(ACTIONS);
   }
 
@@ -150,7 +149,7 @@ export function ClientHostView({ initialGame }: { initialGame: Game }) {
         <div className="space-y-2">
           <Label>Persona Pool (select up to 6)</Label>
           <MultiSelect 
-            options={PERSONAS.flatMap(p => (typeof p === 'string' ? p : p.options))}
+            options={PERSONAS}
             selected={nextPersonaPool} 
             onChange={setNextPersonaPool} 
             placeholder="Select personas for the pool..."
