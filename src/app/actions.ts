@@ -68,7 +68,12 @@ export async function getGameState(gameId: string): Promise<Game | null> {
   if (!gameDoc.exists()) {
     return null;
   }
-  return gameDoc.data() as Game;
+  const gameData = gameDoc.data() as Game;
+  // Ensure rounds is always an array
+  if (!gameData.rounds) {
+    gameData.rounds = [];
+  }
+  return gameData;
 }
 
 export async function getAllGames(): Promise<Game[]> {
@@ -76,7 +81,11 @@ export async function getAllGames(): Promise<Game[]> {
     const gamesSnapshot = await getDocs(gamesCollectionRef);
     const games: Game[] = [];
     gamesSnapshot.forEach(doc => {
-      games.push(doc.data() as Game);
+      const gameData = doc.data() as Game;
+      if (!gameData.rounds) {
+          gameData.rounds = [];
+      }
+      games.push(gameData);
     });
     return games;
 }
@@ -165,7 +174,9 @@ export async function submitQuestion(gameId: string, questionText: string, asker
     if (isFinal) {
       game.status = 'responding';
       // Start LLM generation in the background
-      generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
+      if (currentRound) {
+        generateAndSaveLLMResponse(gameId, questionText, currentRound.correctAnswer.persona, currentRound.correctAnswer.action);
+      }
     }
   
     await saveGame(game);
