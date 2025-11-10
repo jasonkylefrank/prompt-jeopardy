@@ -17,7 +17,7 @@ type QuestionAskerProps = {
 export function QuestionAsker({ gameId, askerId }: QuestionAskerProps) {
     const [question, setQuestion] = useState('');
     const [loading, setLoading] = useState(false);
-    const debouncedQuestion = useDebounce(question, 500);
+    const debouncedQuestion = useDebounce(question, 200);
 
     // Effect to send live updates
     useEffect(() => {
