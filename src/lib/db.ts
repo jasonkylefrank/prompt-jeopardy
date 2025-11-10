@@ -23,7 +23,12 @@ export async function getGame(id: string): Promise<Game | null> {
     if (!gameDoc.exists()) {
       return null;
     }
-    return gameDoc.data() as Game;
+    const gameData = gameDoc.data() as Game;
+    // Ensure rounds is always an array
+    if (!gameData.rounds) {
+      gameData.rounds = [];
+    }
+    return gameData;
   } catch (error) {
     if (error instanceof FirestoreError && error.code === 'permission-denied') {
       const contextualError = new FirestorePermissionError({
