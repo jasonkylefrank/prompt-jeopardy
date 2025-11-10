@@ -13,9 +13,8 @@ export const AppLogo = ({ className, ...props }: React.ComponentProps<"svg">) =>
       className={cn("h-6 w-6", className)}
       {...props}
     >
-      <path d="M12 2a10 10 0 1 0 10 10" />
-      <path d="M12 12a4 4 0 1 0-4-4" />
-      <path d="M12 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 };
