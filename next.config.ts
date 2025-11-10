@@ -36,13 +36,6 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     '*.cloudworkstations.dev',
   ],
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Ensures HMR works correctly in this environment
-      config.watchOptions.poll = 300;
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
