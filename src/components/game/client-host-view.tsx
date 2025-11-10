@@ -49,6 +49,11 @@ import { PlayerGrid } from "./player-grid";
 import { GameInfoPanel } from "./game-info-panel";
 
 export function ClientHostView({ initialGame }: { initialGame: Game }) {
+  // Ensure rounds is always an array, even on initial load
+  if (!initialGame.rounds) {
+    initialGame.rounds = [];
+  }
+
   const { game } = useGameState(initialGame);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
