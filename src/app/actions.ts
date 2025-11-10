@@ -70,7 +70,7 @@ export async function getGameState(gameId: string): Promise<Game | null> {
   }
   const gameData = gameDoc.data() as Game;
   // Ensure rounds is always an array
-  if (!gameData.rounds) {
+  if (!gameData.rounds || !Array.isArray(gameData.rounds)) {
     gameData.rounds = [];
   }
   return gameData;
